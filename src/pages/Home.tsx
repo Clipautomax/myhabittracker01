@@ -1,0 +1,215 @@
+import { usePlanner } from '@/context/PlannerContext';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { ProgressRing } from '@/components/ui/ProgressRing';
+import { TaskItem } from '@/components/tasks/TaskItem';
+import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { Calendar, CheckCircle2, Clock, TrendingUp, Zap } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+const Home = () => {
+  const { 
+    getTodayTasks, 
+    getCurrentDayNumber, 
+    getMonthlyProgress, 
+    getWeeklyConsistency,
+    goals,
+  } = usePlanner();
+
+  const todayTasks = getTodayTasks();
+  const dayNumber = getCurrentDayNumber();
+  const monthlyProgress = getMonthlyProgress();
+  const weeklyConsistency = getWeeklyConsistency();
+  const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
+  const priorityTasks = todayTasks.filter(t => t.priority === 'High').slice(0, 3);
+
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {format(new Date(), 'EEEE, MMMM do, yyyy')}
+            </p>
+          </div>
+          <AddTaskDialog />
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Day Counter */}
+          <div className="dashboard-card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="stat-label">Current Day</p>
+                <p className="stat-value text-primary">
+                  Day {dayNumber}
+                  <span className="text-lg text-muted-foreground font-normal"> / 365</span>
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Progress */}
+          <div className="dashboard-card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="stat-label">Monthly Progress</p>
+                <p className="stat-value">{monthlyProgress}%</p>
+              </div>
+              <ProgressRing progress={monthlyProgress} size={48} strokeWidth={4}>
+                <TrendingUp className="w-4 h-4 text-primary" />
+              </ProgressRing>
+            </div>
+          </div>
+
+          {/* Today's Completion */}
+          <div className="dashboard-card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="stat-label">Today's Tasks</p>
+                <p className="stat-value">
+                  {completedToday}
+                  <span className="text-lg text-muted-foreground font-normal"> / {todayTasks.length}</span>
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-status-completed/10 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-status-completed" />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Goals */}
+          <div className="dashboard-card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="stat-label">Active Goals</p>
+                <p className="stat-value">{goals.length}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Monthly Progress Card */}
+          <div className="dashboard-card lg:col-span-1">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-semibold text-foreground">Monthly Progress</h2>
+              <span className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</span>
+            </div>
+            <div className="flex justify-center py-4">
+              <ProgressRing progress={monthlyProgress} size={160} strokeWidth={12}>
+                <div className="text-center">
+                  <span className="text-4xl font-bold text-foreground">{monthlyProgress}</span>
+                  <span className="text-xl text-muted-foreground">%</span>
+                  <p className="text-xs text-muted-foreground mt-1">Completion</p>
+                </div>
+              </ProgressRing>
+            </div>
+            <div className="mt-6 pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-3">Weekly Consistency</p>
+              <div className="flex justify-between gap-2">
+                {weeklyConsistency.map((score, i) => (
+                  <div key={i} className="flex-1 text-center">
+                    <div
+                      className={cn(
+                        'h-8 rounded-md mb-1 transition-colors',
+                        score === 1 && 'bg-status-completed',
+                        score === 0.5 && 'bg-status-partial',
+                        score === 0 && 'bg-muted'
+                      )}
+                    />
+                    <span className="text-xs text-muted-foreground">{weekDays[i]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Today's Priority Tasks */}
+          <div className="dashboard-card lg:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-semibold text-foreground">Today's Focus</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">High priority tasks for today</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                {format(new Date(), 'h:mm a')}
+              </div>
+            </div>
+
+            {priorityTasks.length > 0 ? (
+              <div className="space-y-3">
+                {priorityTasks.map(task => (
+                  <TaskItem key={task.id} task={task} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No high priority tasks for today</p>
+                <p className="text-sm mt-1">Add tasks to see them here</p>
+              </div>
+            )}
+
+            {todayTasks.length > priorityTasks.length && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground">
+                  + {todayTasks.length - priorityTasks.length} more tasks today
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Goals Preview */}
+        <div className="dashboard-card">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-semibold text-foreground">Active Goals</h2>
+            <a href="/goals" className="text-sm text-primary hover:underline">View all →</a>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {goals.slice(0, 3).map(goal => (
+              <div key={goal.id} className="p-4 rounded-xl bg-secondary/50 border border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {goal.type}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{goal.progress}%</span>
+                </div>
+                <h3 className="font-medium text-foreground truncate">{goal.title}</h3>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${goal.progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            {goals.length === 0 && (
+              <div className="col-span-3 text-center py-8 text-muted-foreground">
+                <p>No goals set yet. Add goals to track your progress.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default Home;
