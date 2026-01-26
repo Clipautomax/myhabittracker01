@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType } from '@/types/planner';
-import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays } from 'date-fns';
+import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth } from '@/types/planner';
+import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays, getMonth, getYear, getDaysInMonth } from 'date-fns';
+
+export interface MonthStats {
+  averageScore: number;
+  completedDays: number;
+  partialDays: number;
+  missedDays: number;
+  totalDays: number;
+}
 
 interface PlannerContextType extends PlannerState {
   // Task actions
@@ -17,6 +25,12 @@ interface PlannerContextType extends PlannerState {
   
   // Day actions
   updateDayRecord: (date: string, updates: Partial<Omit<DayRecord, 'id' | 'date'>>) => void;
+  
+  // Month actions
+  getCurrentMonthStats: () => MonthStats;
+  getCurrentMonthRecord: () => MonthRecord | undefined;
+  getMonthlyChartData: () => { day: string; score: number }[];
+  resetMonthProgress: () => void;
   
   // Computed values
   getTodayTasks: () => Task[];
@@ -132,6 +146,10 @@ const getInitialState = (): PlannerState => {
 
   // Generate sample day records for the past week
   const sampleDays: DayRecord[] = [];
+  const currentMonth = getMonth(new Date());
+  const currentYear = getYear(new Date());
+  const monthId = `${currentYear}-${currentMonth}`;
+  
   for (let i = 7; i >= 1; i--) {
     const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
     const scores = [0, 0.5, 1];
@@ -142,13 +160,29 @@ const getInitialState = (): PlannerState => {
       dayNumber: differenceInDays(parseISO(date), parseISO(cycleStart)) + 1,
       executionScore: scores[Math.floor(Math.random() * 3)],
       energyLevel: energies[Math.floor(Math.random() * 3)],
+      monthId,
     });
   }
+
+  // Create initial month record
+  const initialMonth: MonthRecord = {
+    id: monthId,
+    month: currentMonth,
+    year: currentYear,
+    monthName: format(new Date(), 'MMMM'),
+    averageScore: 0,
+    completedDays: 0,
+    partialDays: 0,
+    missedDays: 0,
+    totalDays: 0,
+  };
 
   return {
     tasks: sampleTasks,
     goals: sampleGoals,
     days: sampleDays,
+    months: [initialMonth],
+    archivedMonths: [],
     cycleStartDate: cycleStart,
   };
 };
@@ -296,6 +330,150 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     return result;
   };
 
+  // Month functions
+  const getCurrentMonthStats = (): MonthStats => {
+    const now = new Date();
+    const currentMonth = getMonth(now);
+    const currentYear = getYear(now);
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const today = now > monthEnd ? monthEnd : now;
+    
+    // Get days in current month that are not archived
+    const monthDays = state.days.filter(d => {
+      const dayDate = parseISO(d.date);
+      return getMonth(dayDate) === currentMonth && 
+             getYear(dayDate) === currentYear && 
+             !d.isArchived;
+    });
+
+    const completedDays = monthDays.filter(d => d.executionScore === 1).length;
+    const partialDays = monthDays.filter(d => d.executionScore === 0.5).length;
+    const missedDays = monthDays.filter(d => d.executionScore === 0).length;
+    const totalDays = monthDays.length;
+    
+    const totalScore = monthDays.reduce((sum, d) => sum + d.executionScore, 0);
+    const averageScore = totalDays > 0 ? Math.round((totalScore / totalDays) * 100) : 0;
+
+    return {
+      averageScore,
+      completedDays,
+      partialDays,
+      missedDays,
+      totalDays,
+    };
+  };
+
+  const getCurrentMonthRecord = (): MonthRecord | undefined => {
+    const currentMonth = getMonth(new Date());
+    const currentYear = getYear(new Date());
+    return state.months.find(m => m.month === currentMonth && m.year === currentYear);
+  };
+
+  const getMonthlyChartData = () => {
+    const now = new Date();
+    const currentMonth = getMonth(now);
+    const currentYear = getYear(now);
+    const daysInMonth = getDaysInMonth(now);
+    const result: { day: string; score: number }[] = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = format(new Date(currentYear, currentMonth, day), 'yyyy-MM-dd');
+      const dayRecord = state.days.find(d => d.date === dateStr && !d.isArchived);
+      
+      // Only include days up to today
+      if (new Date(currentYear, currentMonth, day) <= now) {
+        result.push({
+          day: day.toString(),
+          score: dayRecord ? dayRecord.executionScore * 100 : 0,
+        });
+      }
+    }
+
+    return result;
+  };
+
+  const resetMonthProgress = () => {
+    const now = new Date();
+    const currentMonth = getMonth(now);
+    const currentYear = getYear(now);
+    const monthId = `${currentYear}-${currentMonth}`;
+
+    setState(prev => {
+      // Find days belonging to current month
+      const monthDays = prev.days.filter(d => {
+        const dayDate = parseISO(d.date);
+        return getMonth(dayDate) === currentMonth && 
+               getYear(dayDate) === currentYear && 
+               !d.isArchived;
+      });
+
+      // Create archived month record
+      const currentMonthRecord = prev.months.find(m => m.month === currentMonth && m.year === currentYear);
+      const stats = getCurrentMonthStats();
+      
+      const archivedMonth: ArchivedMonth = {
+        id: generateId(),
+        monthRecord: {
+          id: monthId,
+          month: currentMonth,
+          year: currentYear,
+          monthName: format(now, 'MMMM'),
+          averageScore: stats.averageScore,
+          completedDays: stats.completedDays,
+          partialDays: stats.partialDays,
+          missedDays: stats.missedDays,
+          totalDays: stats.totalDays,
+          resetTimestamp: new Date().toISOString(),
+          isArchived: true,
+        },
+        days: monthDays.map(d => ({ ...d, isArchived: true })),
+        archivedAt: new Date().toISOString(),
+      };
+
+      // Mark current month days as archived
+      const updatedDays = prev.days.map(d => {
+        const dayDate = parseISO(d.date);
+        if (getMonth(dayDate) === currentMonth && 
+            getYear(dayDate) === currentYear && 
+            !d.isArchived) {
+          return { ...d, isArchived: true };
+        }
+        return d;
+      });
+
+      // Update or create new month record
+      const newMonthRecord: MonthRecord = {
+        id: monthId + '-' + generateId(),
+        month: currentMonth,
+        year: currentYear,
+        monthName: format(now, 'MMMM'),
+        averageScore: 0,
+        completedDays: 0,
+        partialDays: 0,
+        missedDays: 0,
+        totalDays: 0,
+        resetTimestamp: new Date().toISOString(),
+      };
+
+      const updatedMonths = prev.months.map(m => 
+        m.month === currentMonth && m.year === currentYear ? newMonthRecord : m
+      );
+
+      // Add month if not exists
+      if (!updatedMonths.find(m => m.month === currentMonth && m.year === currentYear)) {
+        updatedMonths.push(newMonthRecord);
+      }
+
+      return {
+        ...prev,
+        days: updatedDays,
+        months: updatedMonths,
+        archivedMonths: [...prev.archivedMonths, archivedMonth],
+      };
+    });
+  };
+
   return (
     <PlannerContext.Provider
       value={{
@@ -316,6 +494,10 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         getWeeklyConsistency,
         getDayRecord,
         getPerformanceData,
+        getCurrentMonthStats,
+        getCurrentMonthRecord,
+        getMonthlyChartData,
+        resetMonthProgress,
       }}
     >
       {children}
