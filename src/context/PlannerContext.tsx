@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth } from '@/types/planner';
-import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays, getMonth, getYear, getDaysInMonth } from 'date-fns';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth, DayStatus, FixedDailyTask, WeeklyInsight } from '@/types/planner';
+import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays, getMonth, getYear, getDaysInMonth, startOfWeek, endOfWeek } from 'date-fns';
 
 export interface MonthStats {
   averageScore: number;
@@ -18,6 +18,11 @@ interface PlannerContextType extends PlannerState {
   completeTask: (id: string) => void;
   migrateTask: (id: string, newDate: string) => void;
   
+  // Fixed Daily Task actions
+  addFixedDailyTask: (task: Omit<FixedDailyTask, 'id'>) => void;
+  updateFixedDailyTask: (id: string, updates: Partial<FixedDailyTask>) => void;
+  deleteFixedDailyTask: (id: string) => void;
+  
   // Goal actions
   addGoal: (goal: Omit<Goal, 'id'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
@@ -31,6 +36,12 @@ interface PlannerContextType extends PlannerState {
   getCurrentMonthRecord: () => MonthRecord | undefined;
   getMonthlyChartData: () => { day: string; score: number }[];
   resetMonthProgress: () => void;
+  
+  // Execution Intelligence
+  calculateDayStatus: (date: string) => DayStatus;
+  getWeeklyInsight: () => WeeklyInsight;
+  getMostDelayedTasks: (limit?: number) => Task[];
+  getAtRiskTasks: () => Task[];
   
   // Computed values
   getTodayTasks: () => Task[];
@@ -71,6 +82,16 @@ const getInitialState = (): PlannerState => {
       }
       if (!parsed.archivedMonths) {
         parsed.archivedMonths = [];
+      }
+      if (!parsed.fixedDailyTasks) {
+        parsed.fixedDailyTasks = [];
+      }
+      // Migrate tasks to have lastMigratedDate
+      if (parsed.tasks) {
+        parsed.tasks = parsed.tasks.map((t: Task) => ({
+          ...t,
+          lastMigratedDate: t.lastMigratedDate || null,
+        }));
       }
       return parsed;
     } catch {
@@ -166,6 +187,34 @@ const getInitialState = (): PlannerState => {
     },
   ];
 
+  // Default fixed daily tasks
+  const defaultFixedTasks: FixedDailyTask[] = [
+    {
+      id: generateId(),
+      title: 'Morning routine',
+      description: 'Start the day with discipline',
+      time: '06:00',
+      priority: 'High',
+      isActive: true,
+    },
+    {
+      id: generateId(),
+      title: 'Deep work session',
+      description: 'Focused work for 2+ hours',
+      time: '09:00',
+      priority: 'High',
+      isActive: true,
+    },
+    {
+      id: generateId(),
+      title: 'Physical activity',
+      description: '30 minutes exercise',
+      time: '17:00',
+      priority: 'Medium',
+      isActive: true,
+    },
+  ];
+
   // Generate sample day records for the past week
   const sampleDays: DayRecord[] = [];
   const currentMonth = getMonth(new Date());
@@ -205,6 +254,7 @@ const getInitialState = (): PlannerState => {
     days: sampleDays,
     months: [initialMonth],
     archivedMonths: [],
+    fixedDailyTasks: defaultFixedTasks,
     cycleStartDate: cycleStart,
   };
 };
@@ -253,8 +303,33 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     setState(prev => ({
       ...prev,
       tasks: prev.tasks.map(t => 
-        t.id === id ? { ...t, date: newDate, migratedCount: t.migratedCount + 1 } : t
+        t.id === id ? { 
+          ...t, 
+          date: newDate, 
+          migratedCount: t.migratedCount + 1,
+          lastMigratedDate: format(new Date(), 'yyyy-MM-dd'),
+        } : t
       ),
+    }));
+  };
+
+  // Fixed Daily Task actions
+  const addFixedDailyTask = (task: Omit<FixedDailyTask, 'id'>) => {
+    const newTask: FixedDailyTask = { ...task, id: generateId() };
+    setState(prev => ({ ...prev, fixedDailyTasks: [...prev.fixedDailyTasks, newTask] }));
+  };
+
+  const updateFixedDailyTask = (id: string, updates: Partial<FixedDailyTask>) => {
+    setState(prev => ({
+      ...prev,
+      fixedDailyTasks: prev.fixedDailyTasks.map(t => t.id === id ? { ...t, ...updates } : t),
+    }));
+  };
+
+  const deleteFixedDailyTask = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      fixedDailyTasks: prev.fixedDailyTasks.filter(t => t.id !== id),
     }));
   };
 
@@ -496,6 +571,93 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  // Execution Intelligence
+  const calculateDayStatus = useCallback((date: string): DayStatus => {
+    const tasks = state.tasks.filter(t => t.date === date);
+    const fixedTasks = state.fixedDailyTasks.filter(ft => ft.isActive);
+    
+    if (tasks.length === 0) return 'Pending';
+    
+    const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+    const totalTasks = tasks.length;
+    
+    // Check fixed daily tasks completion
+    const fixedTaskTitles = fixedTasks.map(ft => ft.title.toLowerCase());
+    const completedFixedTasks = tasks.filter(t => 
+      t.status === 'Completed' && 
+      (t.isFixed || fixedTaskTitles.some(title => t.title.toLowerCase().includes(title)))
+    ).length;
+    
+    // All tasks completed = Completed
+    if (completedTasks === totalTasks && totalTasks > 0) return 'Completed';
+    
+    // Some tasks completed = Partial
+    if (completedTasks > 0) return 'Partial';
+    
+    // No tasks completed
+    return 'Missed';
+  }, [state.tasks, state.fixedDailyTasks]);
+
+  const getWeeklyInsight = useCallback((): WeeklyInsight => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const weekDays = eachDayOfInterval({ start: weekStart, end: now > weekEnd ? weekEnd : now });
+    
+    let completedDays = 0;
+    let partialDays = 0;
+    let missedDays = 0;
+    let totalScore = 0;
+    let totalTasksCompleted = 0;
+    let totalTasksMigrated = 0;
+
+    weekDays.forEach(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const dayRecord = state.days.find(d => d.date === dateStr);
+      const dayTasks = state.tasks.filter(t => t.date === dateStr);
+      
+      const score = dayRecord?.executionScore ?? 0;
+      totalScore += score;
+      
+      if (score === 1) completedDays++;
+      else if (score === 0.5) partialDays++;
+      else if (dayTasks.length > 0) missedDays++;
+      
+      totalTasksCompleted += dayTasks.filter(t => t.status === 'Completed').length;
+      totalTasksMigrated += dayTasks.filter(t => t.migratedCount > 0).length;
+    });
+
+    // Find most delayed task
+    const migratedTasks = state.tasks.filter(t => t.migratedCount > 0);
+    const mostDelayed = migratedTasks.length > 0 
+      ? migratedTasks.reduce((max, t) => t.migratedCount > max.migratedCount ? t : max)
+      : undefined;
+
+    return {
+      weekStartDate: format(weekStart, 'yyyy-MM-dd'),
+      weekEndDate: format(weekEnd, 'yyyy-MM-dd'),
+      completedDays,
+      partialDays,
+      missedDays,
+      averageScore: weekDays.length > 0 ? Math.round((totalScore / weekDays.length) * 100) : 0,
+      mostDelayedTask: mostDelayed ? { title: mostDelayed.title, migratedCount: mostDelayed.migratedCount } : undefined,
+      totalTasksCompleted,
+      totalTasksMigrated,
+    };
+  }, [state.days, state.tasks]);
+
+  const getMostDelayedTasks = useCallback((limit = 5): Task[] => {
+    return [...state.tasks]
+      .filter(t => t.migratedCount > 0)
+      .sort((a, b) => b.migratedCount - a.migratedCount)
+      .slice(0, limit);
+  }, [state.tasks]);
+
+  const getAtRiskTasks = useCallback((): Task[] => {
+    // Tasks migrated 2+ times are "at risk"
+    return state.tasks.filter(t => t.migratedCount >= 2 && t.status !== 'Completed');
+  }, [state.tasks]);
+
   return (
     <PlannerContext.Provider
       value={{
@@ -505,6 +667,9 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteTask,
         completeTask,
         migrateTask,
+        addFixedDailyTask,
+        updateFixedDailyTask,
+        deleteFixedDailyTask,
         addGoal,
         updateGoal,
         deleteGoal,
@@ -520,6 +685,10 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         getCurrentMonthRecord,
         getMonthlyChartData,
         resetMonthProgress,
+        calculateDayStatus,
+        getWeeklyInsight,
+        getMostDelayedTasks,
+        getAtRiskTasks,
       }}
     >
       {children}
