@@ -6,7 +6,9 @@ import { TaskItem } from '@/components/tasks/TaskItem';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { MonthlyProgressCard } from '@/components/monthly/MonthlyProgressCard';
 import { MonthDetailDialog } from '@/components/monthly/MonthDetailDialog';
-import { Calendar, CheckCircle2, Clock, TrendingUp, Zap } from 'lucide-react';
+import { WeeklySnapshot } from '@/components/weekly/WeeklySnapshot';
+import { FixedDailyTasksCard } from '@/components/tasks/FixedDailyTasksCard';
+import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +20,7 @@ const Home = () => {
     getMonthlyProgress, 
     getWeeklyConsistency,
     getCurrentMonthStats,
+    getAtRiskTasks,
     goals,
   } = usePlanner();
 
@@ -26,6 +29,7 @@ const Home = () => {
   const monthlyProgress = getMonthlyProgress();
   const weeklyConsistency = getWeeklyConsistency();
   const monthStats = getCurrentMonthStats();
+  const atRiskTasks = getAtRiskTasks();
   const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
   const priorityTasks = todayTasks.filter(t => t.priority === 'High').slice(0, 3);
 
@@ -106,6 +110,25 @@ const Home = () => {
               </div>
             </div>
           </div>
+
+          {/* At Risk Tasks */}
+          {atRiskTasks.length > 0 && (
+            <div className="dashboard-card-hover col-span-1 md:col-span-2 lg:col-span-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--status-missed))]/10 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-[hsl(var(--status-missed))]" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">
+                    {atRiskTasks.length} task{atRiskTasks.length > 1 ? 's' : ''} at risk
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Tasks migrated 2+ times need attention
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -147,6 +170,14 @@ const Home = () => {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Weekly Snapshot & Fixed Tasks */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <WeeklySnapshot />
+          <div className="lg:col-span-2">
+            <FixedDailyTasksCard />
           </div>
         </div>
 

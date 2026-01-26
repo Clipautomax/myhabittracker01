@@ -3,6 +3,7 @@ export type TaskPriority = 'High' | 'Medium' | 'Low';
 export type TaskType = 'Daily' | 'Special' | 'Monthly';
 export type EnergyLevel = 'Low' | 'Medium' | 'High';
 export type GoalType = 'Monthly' | 'Yearly';
+export type DayStatus = 'Completed' | 'Partial' | 'Missed' | 'Pending';
 
 export interface Task {
   id: string;
@@ -14,6 +15,17 @@ export interface Task {
   priority: TaskPriority;
   type: TaskType;
   migratedCount: number;
+  lastMigratedDate?: string; // Track when task was last moved
+  isFixed?: boolean; // Fixed daily tasks auto-appear each day
+}
+
+export interface FixedDailyTask {
+  id: string;
+  title: string;
+  description: string;
+  time?: string;
+  priority: TaskPriority;
+  isActive: boolean;
 }
 
 export interface Goal {
@@ -33,6 +45,7 @@ export interface DayRecord {
   energyLevel: EnergyLevel;
   monthId?: string; // Link to MonthRecord
   isArchived?: boolean;
+  dayStatus?: DayStatus; // Auto-calculated from tasks
 }
 
 export interface MonthRecord {
@@ -54,6 +67,28 @@ export interface ArchivedMonth {
   monthRecord: MonthRecord;
   days: DayRecord[];
   archivedAt: string;
+}
+
+export interface WeeklyInsight {
+  weekStartDate: string;
+  weekEndDate: string;
+  completedDays: number;
+  partialDays: number;
+  missedDays: number;
+  averageScore: number;
+  mostDelayedTask?: { title: string; migratedCount: number };
+  totalTasksCompleted: number;
+  totalTasksMigrated: number;
+}
+
+export interface PlannerState {
+  tasks: Task[];
+  goals: Goal[];
+  days: DayRecord[];
+  months: MonthRecord[];
+  archivedMonths: ArchivedMonth[];
+  fixedDailyTasks: FixedDailyTask[];
+  cycleStartDate: string; // For calculating "Day X / 120"
 }
 
 export interface PlannerState {

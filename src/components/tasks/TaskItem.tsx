@@ -56,10 +56,13 @@ export const TaskItem = ({ task, showDate = false }: TaskItemProps) => {
             {task.title}
           </h4>
           {task.migratedCount >= 2 && (
-            <AlertTriangle className="w-4 h-4 text-status-partial flex-shrink-0" />
+            <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--status-missed))]/20 text-[hsl(var(--status-missed))]">
+              <AlertTriangle className="w-3 h-3" />
+              At Risk
+            </span>
           )}
-          {task.migratedCount > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-status-migrated/20 text-status-migrated">
+          {task.migratedCount > 0 && task.migratedCount < 2 && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--status-migrated))]/20 text-[hsl(var(--status-migrated))]">
               ↻{task.migratedCount}
             </span>
           )}
@@ -67,6 +70,11 @@ export const TaskItem = ({ task, showDate = false }: TaskItemProps) => {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {task.time && <span>{task.time}</span>}
           {showDate && <span>{format(new Date(task.date), 'MMM dd')}</span>}
+          {task.lastMigratedDate && (
+            <span className="text-xs text-[hsl(var(--status-migrated))]">
+              Moved {format(new Date(task.lastMigratedDate), 'MMM d')}
+            </span>
+          )}
           <span className="text-xs px-1.5 py-0.5 rounded bg-secondary">{task.type}</span>
         </div>
       </div>
