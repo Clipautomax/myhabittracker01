@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { TaskItem } from '@/components/tasks/TaskItem';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { MonthlyProgressCard } from '@/components/monthly/MonthlyProgressCard';
+import { MonthDetailDialog } from '@/components/monthly/MonthDetailDialog';
 import { Calendar, CheckCircle2, Clock, TrendingUp, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const Home = () => {
+  const [monthDetailOpen, setMonthDetailOpen] = useState(false);
   const { 
     getTodayTasks, 
     getCurrentDayNumber, 
     getMonthlyProgress, 
     getWeeklyConsistency,
+    getCurrentMonthStats,
     goals,
   } = usePlanner();
 
@@ -20,6 +25,7 @@ const Home = () => {
   const dayNumber = getCurrentDayNumber();
   const monthlyProgress = getMonthlyProgress();
   const weeklyConsistency = getWeeklyConsistency();
+  const monthStats = getCurrentMonthStats();
   const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
   const priorityTasks = todayTasks.filter(t => t.priority === 'High').slice(0, 3);
 
@@ -104,40 +110,8 @@ const Home = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Monthly Progress Card */}
-          <div className="dashboard-card lg:col-span-1">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-semibold text-foreground">Monthly Progress</h2>
-              <span className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</span>
-            </div>
-            <div className="flex justify-center py-4">
-              <ProgressRing progress={monthlyProgress} size={160} strokeWidth={12}>
-                <div className="text-center">
-                  <span className="text-4xl font-bold text-foreground">{monthlyProgress}</span>
-                  <span className="text-xl text-muted-foreground">%</span>
-                  <p className="text-xs text-muted-foreground mt-1">Completion</p>
-                </div>
-              </ProgressRing>
-            </div>
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-sm text-muted-foreground mb-3">Weekly Consistency</p>
-              <div className="flex justify-between gap-2">
-                {weeklyConsistency.map((score, i) => (
-                  <div key={i} className="flex-1 text-center">
-                    <div
-                      className={cn(
-                        'h-8 rounded-md mb-1 transition-colors',
-                        score === 1 && 'bg-status-completed',
-                        score === 0.5 && 'bg-status-partial',
-                        score === 0 && 'bg-muted'
-                      )}
-                    />
-                    <span className="text-xs text-muted-foreground">{weekDays[i]}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Monthly Progress Card - Now clickable with detail view */}
+          <MonthlyProgressCard onClick={() => setMonthDetailOpen(true)} />
 
           {/* Today's Priority Tasks */}
           <div className="dashboard-card lg:col-span-2">
@@ -208,6 +182,9 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Month Detail Dialog */}
+      <MonthDetailDialog open={monthDetailOpen} onOpenChange={setMonthDetailOpen} />
     </DashboardLayout>
   );
 };

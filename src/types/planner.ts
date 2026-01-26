@@ -31,11 +31,36 @@ export interface DayRecord {
   dayNumber: number;
   executionScore: number; // 0, 0.5, or 1
   energyLevel: EnergyLevel;
+  monthId?: string; // Link to MonthRecord
+  isArchived?: boolean;
+}
+
+export interface MonthRecord {
+  id: string;
+  month: number; // 0-11
+  year: number;
+  monthName: string;
+  averageScore: number;
+  completedDays: number;
+  partialDays: number;
+  missedDays: number;
+  totalDays: number;
+  resetTimestamp?: string;
+  isArchived?: boolean;
+}
+
+export interface ArchivedMonth {
+  id: string;
+  monthRecord: MonthRecord;
+  days: DayRecord[];
+  archivedAt: string;
 }
 
 export interface PlannerState {
   tasks: Task[];
   goals: Goal[];
   days: DayRecord[];
+  months: MonthRecord[];
+  archivedMonths: ArchivedMonth[];
   cycleStartDate: string; // For calculating "Day X / 120"
 }
