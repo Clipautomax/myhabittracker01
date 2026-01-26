@@ -50,7 +50,29 @@ const getInitialState = (): PlannerState => {
   const saved = localStorage.getItem('plannerState');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Migrate old data that doesn't have months/archivedMonths
+      const currentMonth = getMonth(new Date());
+      const currentYear = getYear(new Date());
+      const monthId = `${currentYear}-${currentMonth}`;
+      
+      if (!parsed.months) {
+        parsed.months = [{
+          id: monthId,
+          month: currentMonth,
+          year: currentYear,
+          monthName: format(new Date(), 'MMMM'),
+          averageScore: 0,
+          completedDays: 0,
+          partialDays: 0,
+          missedDays: 0,
+          totalDays: 0,
+        }];
+      }
+      if (!parsed.archivedMonths) {
+        parsed.archivedMonths = [];
+      }
+      return parsed;
     } catch {
       // Fall through to default
     }
