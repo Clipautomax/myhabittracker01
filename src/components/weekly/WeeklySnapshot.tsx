@@ -81,6 +81,37 @@ export const WeeklySnapshot = () => {
         </div>
       </div>
 
+      {/* Capacity Performance */}
+      <div className="mb-4">
+        <p className="text-sm text-muted-foreground mb-2">Performance by Capacity</p>
+        <div className="space-y-2">
+          {(['Low', 'Normal', 'High'] as const).map((cap) => {
+            const stats = insight.performanceByCapacity[cap];
+            if (stats.days === 0) return null;
+            return (
+              <div key={cap} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{cap} capacity</span>
+                <span className="font-medium text-foreground">
+                  {stats.avgScore}% <span className="text-xs text-muted-foreground">({stats.days}d)</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Overplanning Alert */}
+      {insight.overplanningCount > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-400/10 border border-amber-400/20">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span className="text-sm text-amber-400">
+              Overplanned {insight.overplanningCount} day{insight.overplanningCount > 1 ? 's' : ''} this week
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Tasks Summary */}
       <div className="flex items-center justify-between py-3 border-t border-border">
         <span className="text-sm text-muted-foreground">Tasks completed</span>
