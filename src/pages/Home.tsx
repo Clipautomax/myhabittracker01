@@ -8,6 +8,8 @@ import { MonthlyProgressCard } from '@/components/monthly/MonthlyProgressCard';
 import { MonthDetailDialog } from '@/components/monthly/MonthDetailDialog';
 import { WeeklySnapshot } from '@/components/weekly/WeeklySnapshot';
 import { FixedDailyTasksCard } from '@/components/tasks/FixedDailyTasksCard';
+import { CapacitySelector } from '@/components/capacity/CapacitySelector';
+import { CAPACITY_LIMITS } from '@/types/planner';
 import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -21,8 +23,15 @@ const Home = () => {
     getWeeklyConsistency,
     getCurrentMonthStats,
     getAtRiskTasks,
+    getTodayCapacity,
+    isOverplanned,
     goals,
   } = usePlanner();
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const currentCapacity = getTodayCapacity();
+  const capacityLimit = CAPACITY_LIMITS[currentCapacity];
+  const overplanned = isOverplanned(today);
 
   const todayTasks = getTodayTasks();
   const dayNumber = getCurrentDayNumber();
@@ -82,8 +91,11 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Today's Completion */}
-          <div className="dashboard-card-hover">
+          {/* Today's Completion with Capacity */}
+          <div className={cn(
+            "dashboard-card-hover",
+            overplanned && "ring-1 ring-amber-400/50"
+          )}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="stat-label">Today's Tasks</p>
@@ -91,9 +103,23 @@ const Home = () => {
                   {completedToday}
                   <span className="text-lg text-muted-foreground font-normal"> / {todayTasks.length}</span>
                 </p>
+                {overplanned && (
+                  <p className="text-xs text-amber-400 mt-1">
+                    Exceeds {currentCapacity.toLowerCase()} capacity ({capacityLimit})
+                  </p>
+                )}
               </div>
-              <div className="w-12 h-12 rounded-xl bg-status-completed/10 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-status-completed" />
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center",
+                overplanned 
+                  ? "bg-amber-400/10" 
+                  : "bg-status-completed/10"
+              )}>
+                {overplanned ? (
+                  <AlertTriangle className="w-6 h-6 text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="w-6 h-6 text-status-completed" />
+                )}
               </div>
             </div>
           </div>
@@ -173,12 +199,11 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Weekly Snapshot & Fixed Tasks */}
+        {/* Capacity & Weekly Snapshot */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <CapacitySelector />
           <WeeklySnapshot />
-          <div className="lg:col-span-2">
-            <FixedDailyTasksCard />
-          </div>
+          <FixedDailyTasksCard />
         </div>
 
         {/* Goals Preview */}

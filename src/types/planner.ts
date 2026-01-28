@@ -4,6 +4,14 @@ export type TaskType = 'Daily' | 'Special' | 'Monthly';
 export type EnergyLevel = 'Low' | 'Medium' | 'High';
 export type GoalType = 'Monthly' | 'Yearly';
 export type DayStatus = 'Completed' | 'Partial' | 'Missed' | 'Pending';
+export type DailyCapacity = 'Low' | 'Normal' | 'High';
+
+// Capacity limits for task load guidance
+export const CAPACITY_LIMITS: Record<DailyCapacity, number> = {
+  Low: 3,
+  Normal: 5,
+  High: 8,
+};
 
 export interface Task {
   id: string;
@@ -43,6 +51,7 @@ export interface DayRecord {
   dayNumber: number;
   executionScore: number; // 0, 0.5, or 1
   energyLevel: EnergyLevel;
+  capacity: DailyCapacity; // Daily capacity setting
   monthId?: string; // Link to MonthRecord
   isArchived?: boolean;
   dayStatus?: DayStatus; // Auto-calculated from tasks
@@ -79,6 +88,13 @@ export interface WeeklyInsight {
   mostDelayedTask?: { title: string; migratedCount: number };
   totalTasksCompleted: number;
   totalTasksMigrated: number;
+  // Capacity-based insights
+  performanceByCapacity: {
+    Low: { days: number; avgScore: number };
+    Normal: { days: number; avgScore: number };
+    High: { days: number; avgScore: number };
+  };
+  overplanningCount: number; // Days where tasks exceeded capacity limit
 }
 
 export interface PlannerState {
@@ -88,14 +104,5 @@ export interface PlannerState {
   months: MonthRecord[];
   archivedMonths: ArchivedMonth[];
   fixedDailyTasks: FixedDailyTask[];
-  cycleStartDate: string; // For calculating "Day X / 120"
-}
-
-export interface PlannerState {
-  tasks: Task[];
-  goals: Goal[];
-  days: DayRecord[];
-  months: MonthRecord[];
-  archivedMonths: ArchivedMonth[];
   cycleStartDate: string; // For calculating "Day X / 120"
 }

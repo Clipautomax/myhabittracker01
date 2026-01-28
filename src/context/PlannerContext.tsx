@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth, DayStatus, FixedDailyTask, WeeklyInsight } from '@/types/planner';
+import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth, DayStatus, FixedDailyTask, WeeklyInsight, DailyCapacity, CAPACITY_LIMITS } from '@/types/planner';
 import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays, getMonth, getYear, getDaysInMonth, startOfWeek, endOfWeek } from 'date-fns';
 
 export interface MonthStats {
@@ -42,6 +42,12 @@ interface PlannerContextType extends PlannerState {
   getWeeklyInsight: () => WeeklyInsight;
   getMostDelayedTasks: (limit?: number) => Task[];
   getAtRiskTasks: () => Task[];
+  
+  // Capacity functions
+  getTodayCapacity: () => DailyCapacity;
+  setTodayCapacity: (capacity: DailyCapacity) => void;
+  getCapacityLimit: (capacity: DailyCapacity) => number;
+  isOverplanned: (date: string) => boolean;
   
   // Computed values
   getTodayTasks: () => Task[];
@@ -91,6 +97,13 @@ const getInitialState = (): PlannerState => {
         parsed.tasks = parsed.tasks.map((t: Task) => ({
           ...t,
           lastMigratedDate: t.lastMigratedDate || null,
+        }));
+      }
+      // Migrate days to have capacity
+      if (parsed.days) {
+        parsed.days = parsed.days.map((d: DayRecord) => ({
+          ...d,
+          capacity: d.capacity || 'Normal',
         }));
       }
       return parsed;
@@ -225,12 +238,14 @@ const getInitialState = (): PlannerState => {
     const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
     const scores = [0, 0.5, 1];
     const energies: EnergyLevel[] = ['Low', 'Medium', 'High'];
+    const capacities: DailyCapacity[] = ['Low', 'Normal', 'High'];
     sampleDays.push({
       id: generateId(),
       date,
       dayNumber: differenceInDays(parseISO(date), parseISO(cycleStart)) + 1,
       executionScore: scores[Math.floor(Math.random() * 3)],
       energyLevel: energies[Math.floor(Math.random() * 3)],
+      capacity: capacities[Math.floor(Math.random() * 3)],
       monthId,
     });
   }
@@ -367,6 +382,7 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
           dayNumber: differenceInDays(parseISO(date), parseISO(prev.cycleStartDate)) + 1,
           executionScore: updates.executionScore ?? 0,
           energyLevel: updates.energyLevel ?? 'Medium',
+          capacity: updates.capacity ?? 'Normal',
         };
         return { ...prev, days: [...prev.days, newDay] };
       }
@@ -571,32 +587,32 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
-  // Execution Intelligence
+  // Execution Intelligence - Capacity-aware day status calculation
   const calculateDayStatus = useCallback((date: string): DayStatus => {
     const tasks = state.tasks.filter(t => t.date === date);
-    const fixedTasks = state.fixedDailyTasks.filter(ft => ft.isActive);
+    const dayRecord = state.days.find(d => d.date === date);
+    const capacity = dayRecord?.capacity ?? 'Normal';
+    const capacityLimit = CAPACITY_LIMITS[capacity];
     
     if (tasks.length === 0) return 'Pending';
     
     const completedTasks = tasks.filter(t => t.status === 'Completed').length;
     const totalTasks = tasks.length;
     
-    // Check fixed daily tasks completion
-    const fixedTaskTitles = fixedTasks.map(ft => ft.title.toLowerCase());
-    const completedFixedTasks = tasks.filter(t => 
-      t.status === 'Completed' && 
-      (t.isFixed || fixedTaskTitles.some(title => t.title.toLowerCase().includes(title)))
-    ).length;
+    // For fair evaluation: consider completion relative to capacity
+    // If overplanned, evaluate based on capacity limit not total tasks
+    const effectiveTarget = Math.min(totalTasks, capacityLimit);
+    const completionRate = completedTasks / effectiveTarget;
     
-    // All tasks completed = Completed
-    if (completedTasks === totalTasks && totalTasks > 0) return 'Completed';
+    // Completed: met or exceeded capacity-adjusted target
+    if (completionRate >= 1) return 'Completed';
     
-    // Some tasks completed = Partial
-    if (completedTasks > 0) return 'Partial';
+    // Partial: completed at least 50% of capacity-adjusted target
+    if (completionRate >= 0.5) return 'Partial';
     
-    // No tasks completed
+    // Missed: completed less than 50%
     return 'Missed';
-  }, [state.tasks, state.fixedDailyTasks]);
+  }, [state.tasks, state.days]);
 
   const getWeeklyInsight = useCallback((): WeeklyInsight => {
     const now = new Date();
@@ -610,6 +626,14 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     let totalScore = 0;
     let totalTasksCompleted = 0;
     let totalTasksMigrated = 0;
+    let overplanningCount = 0;
+    
+    // Track performance by capacity
+    const capacityStats: Record<DailyCapacity, { days: number; totalScore: number }> = {
+      Low: { days: 0, totalScore: 0 },
+      Normal: { days: 0, totalScore: 0 },
+      High: { days: 0, totalScore: 0 },
+    };
 
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
@@ -617,6 +641,7 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
       const dayTasks = state.tasks.filter(t => t.date === dateStr);
       
       const score = dayRecord?.executionScore ?? 0;
+      const capacity = dayRecord?.capacity ?? 'Normal';
       totalScore += score;
       
       if (score === 1) completedDays++;
@@ -625,6 +650,18 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       totalTasksCompleted += dayTasks.filter(t => t.status === 'Completed').length;
       totalTasksMigrated += dayTasks.filter(t => t.migratedCount > 0).length;
+      
+      // Track capacity-based performance
+      if (dayRecord) {
+        capacityStats[capacity].days++;
+        capacityStats[capacity].totalScore += score;
+      }
+      
+      // Check for overplanning
+      const capacityLimit = CAPACITY_LIMITS[capacity];
+      if (dayTasks.length > capacityLimit) {
+        overplanningCount++;
+      }
     });
 
     // Find most delayed task
@@ -643,6 +680,21 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
       mostDelayedTask: mostDelayed ? { title: mostDelayed.title, migratedCount: mostDelayed.migratedCount } : undefined,
       totalTasksCompleted,
       totalTasksMigrated,
+      performanceByCapacity: {
+        Low: { 
+          days: capacityStats.Low.days, 
+          avgScore: capacityStats.Low.days > 0 ? Math.round((capacityStats.Low.totalScore / capacityStats.Low.days) * 100) : 0 
+        },
+        Normal: { 
+          days: capacityStats.Normal.days, 
+          avgScore: capacityStats.Normal.days > 0 ? Math.round((capacityStats.Normal.totalScore / capacityStats.Normal.days) * 100) : 0 
+        },
+        High: { 
+          days: capacityStats.High.days, 
+          avgScore: capacityStats.High.days > 0 ? Math.round((capacityStats.High.totalScore / capacityStats.High.days) * 100) : 0 
+        },
+      },
+      overplanningCount,
     };
   }, [state.days, state.tasks]);
 
@@ -657,6 +709,29 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Tasks migrated 2+ times are "at risk"
     return state.tasks.filter(t => t.migratedCount >= 2 && t.status !== 'Completed');
   }, [state.tasks]);
+
+  // Capacity functions
+  const getTodayCapacity = useCallback((): DailyCapacity => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const dayRecord = state.days.find(d => d.date === today);
+    return dayRecord?.capacity ?? 'Normal';
+  }, [state.days]);
+
+  const setTodayCapacity = useCallback((capacity: DailyCapacity) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    updateDayRecord(today, { capacity });
+  }, []);
+
+  const getCapacityLimit = useCallback((capacity: DailyCapacity): number => {
+    return CAPACITY_LIMITS[capacity];
+  }, []);
+
+  const isOverplanned = useCallback((date: string): boolean => {
+    const dayRecord = state.days.find(d => d.date === date);
+    const capacity = dayRecord?.capacity ?? 'Normal';
+    const tasks = state.tasks.filter(t => t.date === date);
+    return tasks.length > CAPACITY_LIMITS[capacity];
+  }, [state.days, state.tasks]);
 
   return (
     <PlannerContext.Provider
@@ -689,6 +764,10 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         getWeeklyInsight,
         getMostDelayedTasks,
         getAtRiskTasks,
+        getTodayCapacity,
+        setTodayCapacity,
+        getCapacityLimit,
+        isOverplanned,
       }}
     >
       {children}
