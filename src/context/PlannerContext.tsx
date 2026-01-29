@@ -306,12 +306,66 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const completeTask = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(t => 
+    setState(prev => {
+      const updatedTasks = prev.tasks.map(t => 
         t.id === id ? { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' as TaskStatus } : t
-      ),
-    }));
+      );
+      
+      // Find the task to get its date
+      const task = prev.tasks.find(t => t.id === id);
+      if (!task) return { ...prev, tasks: updatedTasks };
+      
+      const taskDate = task.date;
+      const tasksForDate = updatedTasks.filter(t => t.date === taskDate);
+      const completedTasks = tasksForDate.filter(t => t.status === 'Completed').length;
+      const totalTasks = tasksForDate.length;
+      
+      // Get capacity for the day
+      const existingDay = prev.days.find(d => d.date === taskDate);
+      const capacity = existingDay?.capacity ?? 'Normal';
+      const capacityLimit = CAPACITY_LIMITS[capacity];
+      
+      // Calculate execution score based on capacity-adjusted target
+      const effectiveTarget = Math.min(totalTasks, capacityLimit);
+      const completionRate = effectiveTarget > 0 ? completedTasks / effectiveTarget : 0;
+      
+      let executionScore = 0;
+      let dayStatus: DayStatus = 'Pending';
+      
+      if (totalTasks > 0) {
+        if (completionRate >= 1) {
+          executionScore = 1;
+          dayStatus = 'Completed';
+        } else if (completionRate >= 0.5) {
+          executionScore = 0.5;
+          dayStatus = 'Partial';
+        } else if (completedTasks > 0) {
+          executionScore = 0.5;
+          dayStatus = 'Partial';
+        } else {
+          executionScore = 0;
+          dayStatus = 'Missed';
+        }
+      }
+      
+      // Update or create day record
+      const updatedDays = existingDay
+        ? prev.days.map(d => d.date === taskDate 
+            ? { ...d, executionScore, dayStatus } 
+            : d
+          )
+        : [...prev.days, {
+            id: generateId(),
+            date: taskDate,
+            dayNumber: differenceInDays(parseISO(taskDate), parseISO(prev.cycleStartDate)) + 1,
+            executionScore,
+            energyLevel: 'Medium' as EnergyLevel,
+            capacity,
+            dayStatus,
+          }];
+      
+      return { ...prev, tasks: updatedTasks, days: updatedDays };
+    });
   };
 
   const migrateTask = (id: string, newDate: string) => {

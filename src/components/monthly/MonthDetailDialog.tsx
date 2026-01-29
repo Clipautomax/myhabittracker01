@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { ProgressRing } from '@/components/ui/ProgressRing';
+import { CapacityInsightsCard } from '@/components/monthly/CapacityInsightsCard';
 import { CheckCircle2, AlertCircle, XCircle, TrendingUp, RotateCcw, Calendar, Archive } from 'lucide-react';
 import { format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
@@ -152,6 +153,9 @@ export const MonthDetailDialog = ({ open, onOpenChange }: MonthDetailDialogProps
               </div>
             </div>
           </div>
+
+          {/* Capacity Trends */}
+          <CapacityInsightsCard />
 
           {/* Daily Progress Line Chart */}
           <div className="p-6 rounded-xl bg-secondary/30 border border-border">

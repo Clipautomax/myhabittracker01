@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProgressRing } from '@/components/ui/ProgressRing';
@@ -9,6 +9,7 @@ import { MonthDetailDialog } from '@/components/monthly/MonthDetailDialog';
 import { WeeklySnapshot } from '@/components/weekly/WeeklySnapshot';
 import { FixedDailyTasksCard } from '@/components/tasks/FixedDailyTasksCard';
 import { CapacitySelector } from '@/components/capacity/CapacitySelector';
+import { NotificationSettings, useNotificationScheduler } from '@/components/notifications/NotificationSettings';
 import { CAPACITY_LIMITS } from '@/types/planner';
 import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -41,6 +42,16 @@ const Home = () => {
   const atRiskTasks = getAtRiskTasks();
   const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
   const priorityTasks = todayTasks.filter(t => t.priority === 'High').slice(0, 3);
+
+  // Schedule daily notification
+  const { scheduleNotification } = useNotificationScheduler();
+  const topTask = priorityTasks[0]?.title || todayTasks[0]?.title;
+  const dayRecord = usePlanner().getDayRecord(today);
+  const dayStatus = dayRecord?.dayStatus || 'Pending';
+  
+  useEffect(() => {
+    scheduleNotification(topTask || 'No tasks today', dayStatus);
+  }, [topTask, dayStatus]);
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -199,11 +210,12 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Capacity & Weekly Snapshot */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Capacity, Weekly & Fixed Tasks */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <CapacitySelector />
           <WeeklySnapshot />
           <FixedDailyTasksCard />
+          <NotificationSettings />
         </div>
 
         {/* Goals Preview */}
