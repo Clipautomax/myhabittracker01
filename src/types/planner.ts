@@ -3,6 +3,7 @@ export type TaskPriority = 'High' | 'Medium' | 'Low';
 export type TaskType = 'Daily' | 'Special' | 'Monthly';
 export type EnergyLevel = 'Low' | 'Medium' | 'High';
 export type GoalType = 'Monthly' | 'Yearly';
+export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 export type DayStatus = 'Completed' | 'Partial' | 'Missed' | 'Pending';
 export type DailyCapacity = 'Low' | 'Normal' | 'High';
 
@@ -43,6 +44,24 @@ export interface Goal {
   startDate: string;
   endDate: string;
   progress: number; // 0-100
+}
+
+export interface WeeklySkillSchedule {
+  id: string;
+  skillName: string;
+  dayOfWeek: DayOfWeek;
+  focusArea: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface SkillTaskOverride {
+  id: string;
+  scheduleId: string;
+  date: string; // ISO date for the specific day
+  isSkipped: boolean;
+  customFocusArea?: string;
+  customDescription?: string;
 }
 
 export interface DayRecord {
@@ -104,5 +123,7 @@ export interface PlannerState {
   months: MonthRecord[];
   archivedMonths: ArchivedMonth[];
   fixedDailyTasks: FixedDailyTask[];
+  weeklySkillSchedules: WeeklySkillSchedule[];
+  skillTaskOverrides: SkillTaskOverride[];
   cycleStartDate: string; // For calculating "Day X / 120"
 }

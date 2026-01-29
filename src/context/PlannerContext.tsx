@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth, DayStatus, FixedDailyTask, WeeklyInsight, DailyCapacity, CAPACITY_LIMITS } from '@/types/planner';
+import { Task, Goal, DayRecord, PlannerState, TaskStatus, TaskPriority, TaskType, EnergyLevel, GoalType, MonthRecord, ArchivedMonth, DayStatus, FixedDailyTask, WeeklyInsight, DailyCapacity, CAPACITY_LIMITS, WeeklySkillSchedule, SkillTaskOverride, DayOfWeek } from '@/types/planner';
 import { format, startOfYear, differenceInDays, parseISO, isToday, startOfMonth, endOfMonth, eachDayOfInterval, subDays, getMonth, getYear, getDaysInMonth, startOfWeek, endOfWeek } from 'date-fns';
 
 export interface MonthStats {
@@ -22,6 +22,17 @@ interface PlannerContextType extends PlannerState {
   addFixedDailyTask: (task: Omit<FixedDailyTask, 'id'>) => void;
   updateFixedDailyTask: (id: string, updates: Partial<FixedDailyTask>) => void;
   deleteFixedDailyTask: (id: string) => void;
+  
+  // Weekly Skill Schedule actions
+  addWeeklySkillSchedule: (schedule: Omit<WeeklySkillSchedule, 'id'>) => void;
+  updateWeeklySkillSchedule: (id: string, updates: Partial<WeeklySkillSchedule>) => void;
+  deleteWeeklySkillSchedule: (id: string) => void;
+  getSkillTasksForDate: (date: string) => Task[];
+  skipSkillTask: (scheduleId: string, date: string) => void;
+  unskipSkillTask: (scheduleId: string, date: string) => void;
+  overrideSkillTask: (scheduleId: string, date: string, customFocusArea?: string, customDescription?: string) => void;
+  isSkillTaskSkipped: (scheduleId: string, date: string) => boolean;
+  getSkillTaskOverride: (scheduleId: string, date: string) => SkillTaskOverride | undefined;
   
   // Goal actions
   addGoal: (goal: Omit<Goal, 'id'>) => void;
@@ -91,6 +102,12 @@ const getInitialState = (): PlannerState => {
       }
       if (!parsed.fixedDailyTasks) {
         parsed.fixedDailyTasks = [];
+      }
+      if (!parsed.weeklySkillSchedules) {
+        parsed.weeklySkillSchedules = [];
+      }
+      if (!parsed.skillTaskOverrides) {
+        parsed.skillTaskOverrides = [];
       }
       // Migrate tasks to have lastMigratedDate
       if (parsed.tasks) {
@@ -270,6 +287,8 @@ const getInitialState = (): PlannerState => {
     months: [initialMonth],
     archivedMonths: [],
     fixedDailyTasks: defaultFixedTasks,
+    weeklySkillSchedules: [],
+    skillTaskOverrides: [],
     cycleStartDate: cycleStart,
   };
 };
@@ -402,6 +421,154 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     }));
   };
 
+  // Weekly Skill Schedule actions
+  const addWeeklySkillSchedule = (schedule: Omit<WeeklySkillSchedule, 'id'>) => {
+    const newSchedule: WeeklySkillSchedule = { ...schedule, id: generateId() };
+    setState(prev => ({ ...prev, weeklySkillSchedules: [...prev.weeklySkillSchedules, newSchedule] }));
+  };
+
+  const updateWeeklySkillSchedule = (id: string, updates: Partial<WeeklySkillSchedule>) => {
+    setState(prev => ({
+      ...prev,
+      weeklySkillSchedules: prev.weeklySkillSchedules.map(s => s.id === id ? { ...s, ...updates } : s),
+    }));
+  };
+
+  const deleteWeeklySkillSchedule = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      weeklySkillSchedules: prev.weeklySkillSchedules.filter(s => s.id !== id),
+      // Also remove related overrides
+      skillTaskOverrides: prev.skillTaskOverrides.filter(o => o.scheduleId !== id),
+    }));
+  };
+
+  const getDayOfWeekFromDate = (date: string): DayOfWeek => {
+    const dayNames: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayIndex = parseISO(date).getDay();
+    return dayNames[dayIndex];
+  };
+
+  const getSkillTasksForDate = useCallback((date: string): Task[] => {
+    const dayOfWeek = getDayOfWeekFromDate(date);
+    const activeSchedules = state.weeklySkillSchedules.filter(
+      s => s.isActive && s.dayOfWeek === dayOfWeek
+    );
+
+    return activeSchedules.map(schedule => {
+      const override = state.skillTaskOverrides.find(
+        o => o.scheduleId === schedule.id && o.date === date
+      );
+
+      // Skip if marked as skipped for this specific date
+      if (override?.isSkipped) {
+        return null;
+      }
+
+      return {
+        id: `skill-${schedule.id}-${date}`,
+        title: `${schedule.skillName}: ${override?.customFocusArea || schedule.focusArea}`,
+        description: override?.customDescription || schedule.description || '',
+        date,
+        status: 'Pending' as TaskStatus,
+        priority: 'Medium' as TaskPriority,
+        type: 'Daily' as TaskType,
+        migratedCount: 0,
+        isFixed: true,
+      };
+    }).filter(Boolean) as Task[];
+  }, [state.weeklySkillSchedules, state.skillTaskOverrides]);
+
+  const skipSkillTask = (scheduleId: string, date: string) => {
+    setState(prev => {
+      const existingOverride = prev.skillTaskOverrides.find(
+        o => o.scheduleId === scheduleId && o.date === date
+      );
+
+      if (existingOverride) {
+        return {
+          ...prev,
+          skillTaskOverrides: prev.skillTaskOverrides.map(o =>
+            o.scheduleId === scheduleId && o.date === date
+              ? { ...o, isSkipped: true }
+              : o
+          ),
+        };
+      }
+
+      return {
+        ...prev,
+        skillTaskOverrides: [
+          ...prev.skillTaskOverrides,
+          {
+            id: generateId(),
+            scheduleId,
+            date,
+            isSkipped: true,
+          },
+        ],
+      };
+    });
+  };
+
+  const unskipSkillTask = (scheduleId: string, date: string) => {
+    setState(prev => ({
+      ...prev,
+      skillTaskOverrides: prev.skillTaskOverrides.map(o =>
+        o.scheduleId === scheduleId && o.date === date
+          ? { ...o, isSkipped: false }
+          : o
+      ),
+    }));
+  };
+
+  const overrideSkillTask = (scheduleId: string, date: string, customFocusArea?: string, customDescription?: string) => {
+    setState(prev => {
+      const existingOverride = prev.skillTaskOverrides.find(
+        o => o.scheduleId === scheduleId && o.date === date
+      );
+
+      if (existingOverride) {
+        return {
+          ...prev,
+          skillTaskOverrides: prev.skillTaskOverrides.map(o =>
+            o.scheduleId === scheduleId && o.date === date
+              ? { ...o, customFocusArea, customDescription }
+              : o
+          ),
+        };
+      }
+
+      return {
+        ...prev,
+        skillTaskOverrides: [
+          ...prev.skillTaskOverrides,
+          {
+            id: generateId(),
+            scheduleId,
+            date,
+            isSkipped: false,
+            customFocusArea,
+            customDescription,
+          },
+        ],
+      };
+    });
+  };
+
+  const isSkillTaskSkipped = useCallback((scheduleId: string, date: string): boolean => {
+    const override = state.skillTaskOverrides.find(
+      o => o.scheduleId === scheduleId && o.date === date
+    );
+    return override?.isSkipped ?? false;
+  }, [state.skillTaskOverrides]);
+
+  const getSkillTaskOverride = useCallback((scheduleId: string, date: string): SkillTaskOverride | undefined => {
+    return state.skillTaskOverrides.find(
+      o => o.scheduleId === scheduleId && o.date === date
+    );
+  }, [state.skillTaskOverrides]);
+
   const addGoal = (goal: Omit<Goal, 'id'>) => {
     const newGoal: Goal = { ...goal, id: generateId() };
     setState(prev => ({ ...prev, goals: [...prev.goals, newGoal] }));
@@ -443,14 +610,18 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
-  const getTodayTasks = () => {
+  const getTodayTasks = useCallback(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    return state.tasks.filter(t => t.date === today);
-  };
+    const regularTasks = state.tasks.filter(t => t.date === today);
+    const skillTasks = getSkillTasksForDate(today);
+    return [...regularTasks, ...skillTasks];
+  }, [state.tasks, getSkillTasksForDate]);
 
-  const getTasksByDate = (date: string) => {
-    return state.tasks.filter(t => t.date === date);
-  };
+  const getTasksByDate = useCallback((date: string) => {
+    const regularTasks = state.tasks.filter(t => t.date === date);
+    const skillTasks = getSkillTasksForDate(date);
+    return [...regularTasks, ...skillTasks];
+  }, [state.tasks, getSkillTasksForDate]);
 
   const getCurrentDayNumber = () => {
     return differenceInDays(new Date(), parseISO(state.cycleStartDate)) + 1;
@@ -799,6 +970,15 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         addFixedDailyTask,
         updateFixedDailyTask,
         deleteFixedDailyTask,
+        addWeeklySkillSchedule,
+        updateWeeklySkillSchedule,
+        deleteWeeklySkillSchedule,
+        getSkillTasksForDate,
+        skipSkillTask,
+        unskipSkillTask,
+        overrideSkillTask,
+        isSkillTaskSkipped,
+        getSkillTaskOverride,
         addGoal,
         updateGoal,
         deleteGoal,

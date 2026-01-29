@@ -10,6 +10,8 @@ import { WeeklySnapshot } from '@/components/weekly/WeeklySnapshot';
 import { FixedDailyTasksCard } from '@/components/tasks/FixedDailyTasksCard';
 import { CapacitySelector } from '@/components/capacity/CapacitySelector';
 import { NotificationSettings, useNotificationScheduler } from '@/components/notifications/NotificationSettings';
+import { WeeklySkillScheduleCard } from '@/components/skills/WeeklySkillScheduleCard';
+import { TodaySkillTasksCard } from '@/components/skills/TodaySkillTasksCard';
 import { CAPACITY_LIMITS } from '@/types/planner';
 import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -210,6 +212,9 @@ const Home = () => {
           </div>
         </div>
 
+        {/* Today's Skill Focus */}
+        <TodaySkillTasksCard />
+
         {/* Capacity, Weekly & Fixed Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <CapacitySelector />
@@ -217,6 +222,9 @@ const Home = () => {
           <FixedDailyTasksCard />
           <NotificationSettings />
         </div>
+
+        {/* Weekly Skill Schedule */}
+        <WeeklySkillScheduleCard />
 
         {/* Goals Preview */}
         <div className="dashboard-card">
