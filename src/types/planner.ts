@@ -74,6 +74,10 @@ export interface DayRecord {
   monthId?: string; // Link to MonthRecord
   isArchived?: boolean;
   dayStatus?: DayStatus; // Auto-calculated from tasks
+  // Sleep tracking
+  sleepStartTime?: string; // HH:mm format
+  wakeUpTime?: string; // HH:mm format
+  sleepDuration?: number; // Hours (auto-calculated)
 }
 
 export interface MonthRecord {

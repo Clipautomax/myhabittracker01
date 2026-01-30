@@ -15,9 +15,10 @@ import { format, addDays } from 'date-fns';
 interface TaskItemProps {
   task: Task;
   showDate?: boolean;
+  onClick?: (task: Task) => void;
 }
 
-export const TaskItem = ({ task, showDate = false }: TaskItemProps) => {
+export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => {
   const { completeTask, migrateTask, deleteTask } = usePlanner();
 
   const priorityClass = {
@@ -31,13 +32,21 @@ export const TaskItem = ({ task, showDate = false }: TaskItemProps) => {
     migrateTask(task.id, tomorrow);
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't trigger click when clicking checkbox or dropdown
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="checkbox"]')) return;
+    onClick?.(task);
+  };
+
   return (
     <div
       className={cn(
-        'dashboard-card flex items-center gap-4 group',
+        'dashboard-card flex items-center gap-4 group cursor-pointer hover:border-primary/50 transition-colors',
         priorityClass,
         task.status === 'Completed' && 'opacity-60'
       )}
+      onClick={handleClick}
     >
       <Checkbox
         checked={task.status === 'Completed'}

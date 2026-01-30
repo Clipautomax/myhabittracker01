@@ -31,10 +31,19 @@ export const AddTaskDialog = ({ defaultDate, trigger }: AddTaskDialogProps) => {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(defaultDate || format(new Date(), 'yyyy-MM-dd'));
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const [date, setDate] = useState(defaultDate || today);
   const [time, setTime] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [type, setType] = useState<TaskType>('Daily');
+
+  // Reset date to today (or defaultDate) when dialog opens
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setDate(defaultDate || format(new Date(), 'yyyy-MM-dd'));
+    }
+    setOpen(isOpen);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +69,7 @@ export const AddTaskDialog = ({ defaultDate, trigger }: AddTaskDialogProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button className="gap-2">

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
+import { Task } from '@/types/planner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { TaskItem } from '@/components/tasks/TaskItem';
+import { TaskEditDialog } from '@/components/tasks/TaskEditDialog';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { MonthlyProgressCard } from '@/components/monthly/MonthlyProgressCard';
 import { MonthDetailDialog } from '@/components/monthly/MonthDetailDialog';
@@ -11,14 +13,19 @@ import { FixedDailyTasksCard } from '@/components/tasks/FixedDailyTasksCard';
 import { CapacitySelector } from '@/components/capacity/CapacitySelector';
 import { NotificationSettings, useNotificationScheduler } from '@/components/notifications/NotificationSettings';
 import { WeeklySkillScheduleCard } from '@/components/skills/WeeklySkillScheduleCard';
-import { TodaySkillTasksCard } from '@/components/skills/TodaySkillTasksCard';
+import { SleepTracker } from '@/components/sleep/SleepTracker';
+import { SleepChart } from '@/components/sleep/SleepChart';
 import { CAPACITY_LIMITS } from '@/types/planner';
 import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useEffect } from 'react';
 
 const Home = () => {
   const [monthDetailOpen, setMonthDetailOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  
   const { 
     getTodayTasks, 
     getCurrentDayNumber, 
@@ -29,6 +36,7 @@ const Home = () => {
     getTodayCapacity,
     isOverplanned,
     goals,
+    getSkillTasksForDate,
   } = usePlanner();
 
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -37,23 +45,32 @@ const Home = () => {
   const overplanned = isOverplanned(today);
 
   const todayTasks = getTodayTasks();
+  const skillTasks = getSkillTasksForDate(today);
   const dayNumber = getCurrentDayNumber();
   const monthlyProgress = getMonthlyProgress();
   const weeklyConsistency = getWeeklyConsistency();
   const monthStats = getCurrentMonthStats();
   const atRiskTasks = getAtRiskTasks();
   const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
-  const priorityTasks = todayTasks.filter(t => t.priority === 'High').slice(0, 3);
+  
+  // Merged focus tasks: high priority + skill tasks
+  const highPriorityTasks = todayTasks.filter(t => t.priority === 'High' && !t.id.startsWith('skill-'));
+  const focusTasks = [...skillTasks, ...highPriorityTasks].slice(0, 5);
 
   // Schedule daily notification
   const { scheduleNotification } = useNotificationScheduler();
-  const topTask = priorityTasks[0]?.title || todayTasks[0]?.title;
+  const topTask = focusTasks[0]?.title || todayTasks[0]?.title;
   const dayRecord = usePlanner().getDayRecord(today);
   const dayStatus = dayRecord?.dayStatus || 'Pending';
   
   useEffect(() => {
     scheduleNotification(topTask || 'No tasks today', dayStatus);
   }, [topTask, dayStatus]);
+
+  const handleTaskClick = (task: Task) => {
+    setEditingTask(task);
+    setEditDialogOpen(true);
+  };
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -175,12 +192,14 @@ const Home = () => {
           {/* Monthly Progress Card - Now clickable with detail view */}
           <MonthlyProgressCard onClick={() => setMonthDetailOpen(true)} />
 
-          {/* Today's Priority Tasks */}
+          {/* Today's Focus - Merged skill tasks + high priority */}
           <div className="dashboard-card lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-semibold text-foreground">Today's Focus</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">High priority tasks for today</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Skill tasks + high priority items
+                </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="w-4 h-4" />
@@ -188,32 +207,42 @@ const Home = () => {
               </div>
             </div>
 
-            {priorityTasks.length > 0 ? (
+            {focusTasks.length > 0 ? (
               <div className="space-y-3">
-                {priorityTasks.map(task => (
-                  <TaskItem key={task.id} task={task} />
+                {focusTasks.map(task => (
+                  <div key={task.id} className="relative">
+                    <TaskItem task={task} onClick={handleTaskClick} />
+                    {task.id.startsWith('skill-') && (
+                      <span className="absolute top-2 right-12 text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                        Skill
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No high priority tasks for today</p>
-                <p className="text-sm mt-1">Add tasks to see them here</p>
+                <p>No focus tasks for today</p>
+                <p className="text-sm mt-1">Add skill schedules or high priority tasks</p>
               </div>
             )}
 
-            {todayTasks.length > priorityTasks.length && (
+            {todayTasks.length > focusTasks.length && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-sm text-muted-foreground">
-                  + {todayTasks.length - priorityTasks.length} more tasks today
+                  + {todayTasks.length - focusTasks.length} more tasks today
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Today's Skill Focus */}
-        <TodaySkillTasksCard />
+        {/* Sleep Tracking Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SleepTracker />
+          <SleepChart days={7} />
+        </div>
 
         {/* Capacity, Weekly & Fixed Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -261,6 +290,13 @@ const Home = () => {
 
       {/* Month Detail Dialog */}
       <MonthDetailDialog open={monthDetailOpen} onOpenChange={setMonthDetailOpen} />
+
+      {/* Task Edit Dialog */}
+      <TaskEditDialog 
+        task={editingTask} 
+        open={editDialogOpen} 
+        onOpenChange={setEditDialogOpen} 
+      />
     </DashboardLayout>
   );
 };

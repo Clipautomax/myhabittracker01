@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
+import { Task } from '@/types/planner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TaskItem } from '@/components/tasks/TaskItem';
+import { TaskEditDialog } from '@/components/tasks/TaskEditDialog';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { SleepTracker } from '@/components/sleep/SleepTracker';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { 
@@ -24,6 +27,8 @@ const CalendarPage = () => {
   const { tasks, getTasksByDate, getDayRecord } = usePlanner();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -39,7 +44,7 @@ const CalendarPage = () => {
 
   const getTaskCountForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return tasks.filter(t => t.date === dateStr).length;
+    return getTasksByDate(dateStr).length;
   };
 
   const getDayStatusColor = (date: Date) => {
@@ -50,6 +55,15 @@ const CalendarPage = () => {
     if (dayRecord.executionScore === 0.5) return 'bg-status-partial';
     return 'bg-status-missed';
   };
+
+  const handleTaskClick = (task: Task) => {
+    setEditingTask(task);
+    setEditDialogOpen(true);
+  };
+
+  // Group tasks by type for better organization
+  const regularTasks = selectedTasks.filter(t => !t.id.startsWith('skill-'));
+  const skillTasks = selectedTasks.filter(t => t.id.startsWith('skill-'));
 
   return (
     <DashboardLayout>
@@ -145,68 +159,115 @@ const CalendarPage = () => {
             </div>
           </div>
 
-          {/* Selected Day Tasks */}
-          <div className="dashboard-card">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  {format(selectedDate, 'EEEE')}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {format(selectedDate, 'MMMM d, yyyy')}
-                </p>
-              </div>
-              <AddTaskDialog 
-                defaultDate={selectedDateStr}
-                trigger={
-                  <Button size="icon" variant="ghost">
-                    <Plus className="w-5 h-5" />
-                  </Button>
-                }
-              />
-            </div>
-
-            {/* Day Status */}
-            {selectedDayRecord && (
-              <div className="mb-4 p-3 rounded-lg bg-secondary/50">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Execution Score</span>
-                  <span className={cn(
-                    'font-semibold',
-                    selectedDayRecord.executionScore === 1 && 'text-status-completed',
-                    selectedDayRecord.executionScore === 0.5 && 'text-status-partial',
-                    selectedDayRecord.executionScore === 0 && 'text-status-missed'
-                  )}>
-                    {selectedDayRecord.executionScore * 100}%
-                  </span>
+          {/* Selected Day Panel */}
+          <div className="space-y-4">
+            {/* Day Header & Tasks */}
+            <div className="dashboard-card">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-foreground">
+                    {format(selectedDate, 'EEEE')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(selectedDate, 'MMMM d, yyyy')}
+                  </p>
                 </div>
+                <AddTaskDialog 
+                  defaultDate={selectedDateStr}
+                  trigger={
+                    <Button size="icon" variant="ghost">
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  }
+                />
               </div>
-            )}
 
-            {/* Tasks List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
-              {selectedTasks.length > 0 ? (
-                selectedTasks.map(task => (
-                  <TaskItem key={task.id} task={task} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="mb-2">No tasks for this day</p>
-                  <AddTaskDialog 
-                    defaultDate={selectedDateStr}
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Task
-                      </Button>
-                    }
-                  />
+              {/* Day Status */}
+              {selectedDayRecord && (
+                <div className="mb-4 p-3 rounded-lg bg-secondary/50">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Execution Score</span>
+                    <span className={cn(
+                      'font-semibold',
+                      selectedDayRecord.executionScore === 1 && 'text-status-completed',
+                      selectedDayRecord.executionScore === 0.5 && 'text-status-partial',
+                      selectedDayRecord.executionScore === 0 && 'text-status-missed'
+                    )}>
+                      {selectedDayRecord.executionScore * 100}%
+                    </span>
+                  </div>
                 </div>
               )}
+
+              {/* All Tasks List */}
+              <div className="space-y-4 max-h-80 overflow-y-auto scrollbar-thin">
+                {/* Skill Tasks */}
+                {skillTasks.length > 0 && (
+                  <div>
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary" />
+                      Skill Focus ({skillTasks.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {skillTasks.map(task => (
+                        <TaskItem 
+                          key={task.id} 
+                          task={task} 
+                          onClick={handleTaskClick}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Regular Tasks */}
+                {regularTasks.length > 0 && (
+                  <div>
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-status-completed" />
+                      Tasks ({regularTasks.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {regularTasks.map(task => (
+                        <TaskItem 
+                          key={task.id} 
+                          task={task} 
+                          onClick={handleTaskClick}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTasks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="mb-2">No tasks for this day</p>
+                    <AddTaskDialog 
+                      defaultDate={selectedDateStr}
+                      trigger={
+                        <Button variant="outline" size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Task
+                        </Button>
+                      }
+                    />
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Sleep Tracker for selected day */}
+            <SleepTracker date={selectedDateStr} compact />
           </div>
         </div>
       </div>
+
+      {/* Task Edit Dialog */}
+      <TaskEditDialog 
+        task={editingTask} 
+        open={editDialogOpen} 
+        onOpenChange={setEditDialogOpen} 
+      />
     </DashboardLayout>
   );
 };
