@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
+import { Task } from '@/types/planner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TaskItem } from '@/components/tasks/TaskItem';
+import { TaskEditDialog } from '@/components/tasks/TaskEditDialog';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { SleepTracker } from '@/components/sleep/SleepTracker';
 import { Button } from '@/components/ui/button';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { Sun, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
@@ -14,17 +18,28 @@ const Today = () => {
   const todayTasks = getTodayTasks();
   const dayRecord = getDayRecord(today);
 
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
   const completedCount = todayTasks.filter(t => t.status === 'Completed').length;
   const totalCount = todayTasks.length;
   const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const dailyTasks = todayTasks.filter(t => t.type === 'Daily');
-  const specialTasks = todayTasks.filter(t => t.type === 'Special' || t.type === 'Monthly');
+  // Group tasks
+  const skillTasks = todayTasks.filter(t => t.id.startsWith('skill-'));
+  const regularTasks = todayTasks.filter(t => !t.id.startsWith('skill-'));
+  const dailyTasks = regularTasks.filter(t => t.type === 'Daily');
+  const specialTasks = regularTasks.filter(t => t.type === 'Special' || t.type === 'Monthly');
   const highPriorityTasks = todayTasks.filter(t => t.priority === 'High');
 
   const handleEndDay = (status: 'Completed' | 'Partial' | 'Missed') => {
     const score = status === 'Completed' ? 1 : status === 'Partial' ? 0.5 : 0;
     updateDayRecord(today, { executionScore: score });
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setEditingTask(task);
+    setEditDialogOpen(true);
   };
 
   return (
@@ -48,20 +63,22 @@ const Today = () => {
 
         {/* Progress Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="dashboard-card lg:col-span-1">
-            <h2 className="font-semibold text-foreground mb-6">Today's Progress</h2>
-            <div className="flex justify-center py-4">
-              <ProgressRing progress={completionPercentage} size={180} strokeWidth={14}>
-                <div className="text-center">
-                  <span className="text-5xl font-bold text-foreground">{completedCount}</span>
-                  <span className="text-2xl text-muted-foreground">/{totalCount}</span>
-                  <p className="text-sm text-muted-foreground mt-2">Tasks completed</p>
-                </div>
-              </ProgressRing>
+          <div className="dashboard-card lg:col-span-1 space-y-6">
+            <div>
+              <h2 className="font-semibold text-foreground mb-6">Today's Progress</h2>
+              <div className="flex justify-center py-4">
+                <ProgressRing progress={completionPercentage} size={180} strokeWidth={14}>
+                  <div className="text-center">
+                    <span className="text-5xl font-bold text-foreground">{completedCount}</span>
+                    <span className="text-2xl text-muted-foreground">/{totalCount}</span>
+                    <p className="text-sm text-muted-foreground mt-2">Tasks completed</p>
+                  </div>
+                </ProgressRing>
+              </div>
             </div>
 
             {/* End Day Actions */}
-            <div className="mt-6 pt-6 border-t border-border">
+            <div className="pt-6 border-t border-border">
               <p className="text-sm text-muted-foreground mb-4">Mark today as:</p>
               <div className="grid grid-cols-3 gap-2">
                 <Button
@@ -102,35 +119,63 @@ const Today = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Sleep Tracker */}
+            <SleepTracker date={today} compact />
           </div>
 
           {/* Tasks List */}
           <div className="lg:col-span-2 space-y-6">
-            {/* High Priority Tasks */}
-            {highPriorityTasks.length > 0 && (
-              <div className="dashboard-card">
-                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-status-missed" />
-                  Top Priority ({highPriorityTasks.length})
-                </h3>
-                <div className="space-y-3">
-                  {highPriorityTasks.map(task => (
-                    <TaskItem key={task.id} task={task} />
-                  ))}
-                </div>
+            {/* Today's Focus - High Priority + Skill Tasks merged */}
+            <div className="dashboard-card">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                Today's Focus ({highPriorityTasks.length + skillTasks.length})
+              </h3>
+              <div className="space-y-4">
+                {/* Skill Tasks Section */}
+                {skillTasks.length > 0 && (
+                  <div className="space-y-2">
+                    {skillTasks.map(task => (
+                      <div key={task.id} className="relative">
+                        <TaskItem task={task} onClick={handleTaskClick} />
+                        <span className="absolute top-2 right-12 text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                          Skill
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* High Priority Tasks */}
+                {highPriorityTasks.filter(t => !t.id.startsWith('skill-')).length > 0 && (
+                  <div className="space-y-2">
+                    {highPriorityTasks
+                      .filter(t => !t.id.startsWith('skill-'))
+                      .map(task => (
+                        <TaskItem key={task.id} task={task} onClick={handleTaskClick} />
+                      ))}
+                  </div>
+                )}
+
+                {highPriorityTasks.length === 0 && skillTasks.length === 0 && (
+                  <p className="text-muted-foreground text-sm py-4">
+                    No focus tasks for today. Add high priority tasks or skill schedules.
+                  </p>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Daily Habits */}
             <div className="dashboard-card">
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                Daily Habits ({dailyTasks.length})
+                <span className="w-2 h-2 rounded-full bg-status-completed" />
+                Daily Tasks ({dailyTasks.length})
               </h3>
               {dailyTasks.length > 0 ? (
                 <div className="space-y-3">
                   {dailyTasks.map(task => (
-                    <TaskItem key={task.id} task={task} />
+                    <TaskItem key={task.id} task={task} onClick={handleTaskClick} />
                   ))}
                 </div>
               ) : (
@@ -149,7 +194,7 @@ const Today = () => {
                 </h3>
                 <div className="space-y-3">
                   {specialTasks.map(task => (
-                    <TaskItem key={task.id} task={task} />
+                    <TaskItem key={task.id} task={task} onClick={handleTaskClick} />
                   ))}
                 </div>
               </div>
@@ -169,6 +214,13 @@ const Today = () => {
           </div>
         </div>
       </div>
+
+      {/* Task Edit Dialog */}
+      <TaskEditDialog 
+        task={editingTask} 
+        open={editDialogOpen} 
+        onOpenChange={setEditDialogOpen} 
+      />
     </DashboardLayout>
   );
 };
