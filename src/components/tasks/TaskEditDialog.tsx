@@ -27,7 +27,7 @@ interface TaskEditDialogProps {
 }
 
 export const TaskEditDialog = ({ task, open, onOpenChange }: TaskEditDialogProps) => {
-  const { updateTask, deleteTask, migrateTask } = usePlanner();
+  const { updateTask, deleteTask, migrateTask, completeSkillTask, tasks } = usePlanner();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -53,6 +53,15 @@ export const TaskEditDialog = ({ task, open, onOpenChange }: TaskEditDialogProps
 
   // Check if this is a skill task (has special ID format)
   const isSkillTask = task.id.startsWith('skill-');
+
+  // For skill tasks, check if there's a matching completed regular task
+  const isSkillTaskCompleted = () => {
+    if (!isSkillTask) return task.status === 'Completed';
+    const matchingTask = tasks.find(
+      t => t.title === task.title && t.date === task.date && t.status === 'Completed'
+    );
+    return !!matchingTask;
+  };
 
   const handleSave = () => {
     if (!title.trim() || isSkillTask) return;
@@ -80,6 +89,13 @@ export const TaskEditDialog = ({ task, open, onOpenChange }: TaskEditDialogProps
     if (isSkillTask) return;
     const tomorrow = format(addDays(new Date(task.date), 1), 'yyyy-MM-dd');
     migrateTask(task.id, tomorrow);
+    onOpenChange(false);
+  };
+
+  const handleToggleComplete = () => {
+    if (isSkillTask) {
+      completeSkillTask(task.id, task.date);
+    }
     onOpenChange(false);
   };
 
@@ -241,9 +257,17 @@ export const TaskEditDialog = ({ task, open, onOpenChange }: TaskEditDialogProps
           )}
 
           {isSkillTask && (
-            <p className="text-sm text-muted-foreground text-center py-2">
-              Skill tasks are managed from the Weekly Skill Schedule
-            </p>
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                Skill tasks are from Weekly Schedule
+              </p>
+              <Button 
+                onClick={handleToggleComplete}
+                variant={isSkillTaskCompleted() ? "outline" : "default"}
+              >
+                {isSkillTaskCompleted() ? 'Mark Incomplete' : 'Mark Complete'}
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

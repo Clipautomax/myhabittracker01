@@ -51,9 +51,9 @@ const CalendarPage = () => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const dayRecord = getDayRecord(dateStr);
     if (!dayRecord) return null;
-    if (dayRecord.executionScore === 1) return 'bg-status-completed';
-    if (dayRecord.executionScore === 0.5) return 'bg-status-partial';
-    return 'bg-status-missed';
+    if (dayRecord.executionScore === 1) return 'bg-foreground/80';
+    if (dayRecord.executionScore === 0.5) return 'bg-foreground/50';
+    return 'bg-foreground/25';
   };
 
   const handleTaskClick = (task: Task) => {
@@ -70,7 +70,7 @@ const CalendarPage = () => {
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">Calendar</h1>
           <AddTaskDialog defaultDate={selectedDateStr} />
         </div>
 
@@ -83,6 +83,7 @@ const CalendarPage = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                className="rounded-xl"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
@@ -93,6 +94,7 @@ const CalendarPage = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                className="rounded-xl"
               >
                 <ChevronRight className="w-5 h-5" />
               </Button>
@@ -123,8 +125,8 @@ const CalendarPage = () => {
                     className={cn(
                       'relative aspect-square p-1 rounded-xl transition-all hover:bg-secondary',
                       !isCurrentMonth && 'opacity-30',
-                      isSelected && 'bg-primary text-primary-foreground hover:bg-primary',
-                      isTodayDate && !isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                      isSelected && 'bg-foreground text-background hover:bg-foreground',
+                      isTodayDate && !isSelected && 'ring-1 ring-foreground/50'
                     )}
                   >
                     <span className="text-sm font-medium">{format(day, 'd')}</span>
@@ -137,7 +139,7 @@ const CalendarPage = () => {
                             key={i}
                             className={cn(
                               'w-1 h-1 rounded-full',
-                              isSelected ? 'bg-primary-foreground' : 'bg-primary'
+                              isSelected ? 'bg-background' : 'bg-foreground/60'
                             )}
                           />
                         ))}

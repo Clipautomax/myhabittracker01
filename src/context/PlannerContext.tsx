@@ -16,6 +16,7 @@ interface PlannerContextType extends PlannerState {
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   completeTask: (id: string) => void;
+  completeSkillTask: (skillTaskId: string, date: string) => void;
   migrateTask: (id: string, newDate: string) => void;
   
   // Fixed Daily Task actions
@@ -385,6 +386,93 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       return { ...prev, tasks: updatedTasks, days: updatedDays };
     });
+  };
+
+  // Complete skill task by creating a real task entry
+  const completeSkillTask = (skillTaskId: string, date: string) => {
+    // Parse the skill task ID to get the schedule ID
+    const parts = skillTaskId.split('-');
+    if (parts.length < 3 || parts[0] !== 'skill') return;
+    
+    const scheduleId = parts[1];
+    const schedule = state.weeklySkillSchedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    // Check if there's already a completed task for this skill on this date
+    const existingTask = state.tasks.find(
+      t => t.title === `${schedule.skillName}: ${schedule.focusArea}` && 
+           t.date === date
+    );
+
+    if (existingTask) {
+      // Toggle completion
+      completeTask(existingTask.id);
+    } else {
+      // Create new completed task
+      const newTask: Task = {
+        id: generateId(),
+        title: `${schedule.skillName}: ${schedule.focusArea}`,
+        description: schedule.description || '',
+        date,
+        status: 'Completed',
+        priority: 'Medium',
+        type: 'Daily',
+        migratedCount: 0,
+        isFixed: true,
+      };
+      
+      setState(prev => {
+        const updatedTasks = [...prev.tasks, newTask];
+        
+        // Recalculate day status
+        const tasksForDate = updatedTasks.filter(t => t.date === date);
+        const completedTasks = tasksForDate.filter(t => t.status === 'Completed').length;
+        const totalTasks = tasksForDate.length;
+        
+        const existingDay = prev.days.find(d => d.date === date);
+        const capacity = existingDay?.capacity ?? 'Normal';
+        const capacityLimit = CAPACITY_LIMITS[capacity];
+        
+        const effectiveTarget = Math.min(totalTasks, capacityLimit);
+        const completionRate = effectiveTarget > 0 ? completedTasks / effectiveTarget : 0;
+        
+        let executionScore = 0;
+        let dayStatus: DayStatus = 'Pending';
+        
+        if (totalTasks > 0) {
+          if (completionRate >= 1) {
+            executionScore = 1;
+            dayStatus = 'Completed';
+          } else if (completionRate >= 0.5) {
+            executionScore = 0.5;
+            dayStatus = 'Partial';
+          } else if (completedTasks > 0) {
+            executionScore = 0.5;
+            dayStatus = 'Partial';
+          } else {
+            executionScore = 0;
+            dayStatus = 'Missed';
+          }
+        }
+        
+        const updatedDays = existingDay
+          ? prev.days.map(d => d.date === date 
+              ? { ...d, executionScore, dayStatus } 
+              : d
+            )
+          : [...prev.days, {
+              id: generateId(),
+              date,
+              dayNumber: differenceInDays(parseISO(date), parseISO(prev.cycleStartDate)) + 1,
+              executionScore,
+              energyLevel: 'Medium' as EnergyLevel,
+              capacity,
+              dayStatus,
+            }];
+        
+        return { ...prev, tasks: updatedTasks, days: updatedDays };
+      });
+    }
   };
 
   const migrateTask = (id: string, newDate: string) => {
@@ -966,6 +1054,7 @@ export const PlannerProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateTask,
         deleteTask,
         completeTask,
+        completeSkillTask,
         migrateTask,
         addFixedDailyTask,
         updateFixedDailyTask,

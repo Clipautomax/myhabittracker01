@@ -72,9 +72,8 @@ export const AddTaskDialog = ({ defaultDate, trigger }: AddTaskDialogProps) => {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Task
+          <Button variant="outline" size="icon" className="rounded-xl border-border">
+            <Plus className="w-5 h-5" />
           </Button>
         )}
       </DialogTrigger>

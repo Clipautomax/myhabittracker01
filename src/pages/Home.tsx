@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import { Task } from '@/types/planner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -16,10 +16,9 @@ import { WeeklySkillScheduleCard } from '@/components/skills/WeeklySkillSchedule
 import { SleepTracker } from '@/components/sleep/SleepTracker';
 import { SleepChart } from '@/components/sleep/SleepChart';
 import { CAPACITY_LIMITS } from '@/types/planner';
-import { Calendar, CheckCircle2, Clock, TrendingUp, Zap, AlertTriangle } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, TrendingUp, Target, AlertTriangle, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
 
 const Home = () => {
   const [monthDetailOpen, setMonthDetailOpen] = useState(false);
@@ -30,13 +29,13 @@ const Home = () => {
     getTodayTasks, 
     getCurrentDayNumber, 
     getMonthlyProgress, 
-    getWeeklyConsistency,
     getCurrentMonthStats,
     getAtRiskTasks,
     getTodayCapacity,
     isOverplanned,
     goals,
     getSkillTasksForDate,
+    getDayRecord,
   } = usePlanner();
 
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -48,7 +47,6 @@ const Home = () => {
   const skillTasks = getSkillTasksForDate(today);
   const dayNumber = getCurrentDayNumber();
   const monthlyProgress = getMonthlyProgress();
-  const weeklyConsistency = getWeeklyConsistency();
   const monthStats = getCurrentMonthStats();
   const atRiskTasks = getAtRiskTasks();
   const completedToday = todayTasks.filter(t => t.status === 'Completed').length;
@@ -60,7 +58,7 @@ const Home = () => {
   // Schedule daily notification
   const { scheduleNotification } = useNotificationScheduler();
   const topTask = focusTasks[0]?.title || todayTasks[0]?.title;
-  const dayRecord = usePlanner().getDayRecord(today);
+  const dayRecord = getDayRecord(today);
   const dayStatus = dayRecord?.dayStatus || 'Pending';
   
   useEffect(() => {
@@ -72,180 +70,171 @@ const Home = () => {
     setEditDialogOpen(true);
   };
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
+        {/* Header - Large bold like reference */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+              Focus
             </h1>
             <p className="text-muted-foreground mt-1">
-              {format(new Date(), 'EEEE, MMMM do, yyyy')}
+              {format(new Date(), 'EEEE, MMMM do')}
             </p>
           </div>
-          <AddTaskDialog />
+          <div className="flex items-center gap-2">
+            <AddTaskDialog />
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Day Counter */}
-          <div className="dashboard-card-hover">
-            <div className="flex items-center justify-between">
+        {/* Stats Grid - Card based like reference */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Day Progress Card */}
+          <div className="dashboard-card">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="stat-label">Current Day</p>
-                <p className="stat-value text-primary">
-                  Day {dayNumber}
-                  <span className="text-lg text-muted-foreground font-normal"> / 365</span>
-                </p>
+                <ProgressRing progress={monthlyProgress} size={48} strokeWidth={4}>
+                  <span className="text-xs font-bold">{monthlyProgress}%</span>
+                </ProgressRing>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-primary" />
+              <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-foreground/70" />
               </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-foreground font-semibold">Month Progress</p>
+              <p className="text-sm text-muted-foreground">Day {dayNumber}</p>
             </div>
           </div>
 
-          {/* Monthly Progress */}
-          <div className="dashboard-card-hover">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="stat-label">Monthly Progress</p>
-                <p className="stat-value">{monthlyProgress}%</p>
-              </div>
-              <ProgressRing progress={monthlyProgress} size={48} strokeWidth={4}>
-                <TrendingUp className="w-4 h-4 text-primary" />
-              </ProgressRing>
-            </div>
-          </div>
-
-          {/* Today's Completion with Capacity */}
+          {/* Today's Completion */}
           <div className={cn(
-            "dashboard-card-hover",
-            overplanned && "ring-1 ring-amber-400/50"
+            "dashboard-card",
+            overplanned && "ring-1 ring-muted-foreground/30"
           )}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="stat-label">Today's Tasks</p>
-                <p className="stat-value">
-                  {completedToday}
-                  <span className="text-lg text-muted-foreground font-normal"> / {todayTasks.length}</span>
-                </p>
-                {overplanned && (
-                  <p className="text-xs text-amber-400 mt-1">
-                    Exceeds {currentCapacity.toLowerCase()} capacity ({capacityLimit})
-                  </p>
-                )}
+                <p className="text-3xl font-bold text-foreground">{completedToday}</p>
+                <p className="text-sm text-muted-foreground">/ {todayTasks.length} tasks</p>
               </div>
               <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center",
-                overplanned 
-                  ? "bg-amber-400/10" 
-                  : "bg-status-completed/10"
+                "w-8 h-8 rounded-xl flex items-center justify-center",
+                overplanned ? "bg-muted" : "bg-secondary"
               )}>
                 {overplanned ? (
-                  <AlertTriangle className="w-6 h-6 text-amber-400" />
+                  <AlertTriangle className="w-4 h-4 text-muted-foreground" />
                 ) : (
-                  <CheckCircle2 className="w-6 h-6 text-status-completed" />
+                  <CheckCircle2 className="w-4 h-4 text-foreground/70" />
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Active Goals */}
-          <div className="dashboard-card-hover">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="stat-label">Active Goals</p>
-                <p className="stat-value">{goals.length}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Zap className="w-6 h-6 text-primary" />
-              </div>
+            <div className="mt-3">
+              <p className="text-foreground font-semibold">Today's Tasks</p>
+              {overplanned && (
+                <p className="text-xs text-muted-foreground">Exceeds {currentCapacity.toLowerCase()} capacity</p>
+              )}
             </div>
           </div>
-
-          {/* At Risk Tasks */}
-          {atRiskTasks.length > 0 && (
-            <div className="dashboard-card-hover col-span-1 md:col-span-2 lg:col-span-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--status-missed))]/10 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-[hsl(var(--status-missed))]" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {atRiskTasks.length} task{atRiskTasks.length > 1 ? 's' : ''} at risk
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Tasks migrated 2+ times need attention
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Monthly Progress Card - Now clickable with detail view */}
-          <MonthlyProgressCard onClick={() => setMonthDetailOpen(true)} />
-
-          {/* Today's Focus - Merged skill tasks + high priority */}
-          <div className="dashboard-card lg:col-span-2">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-semibold text-foreground">Today's Focus</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Skill tasks + high priority items
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" />
-                {format(new Date(), 'h:mm a')}
-              </div>
+        {/* At Risk Alert */}
+        {atRiskTasks.length > 0 && (
+          <div className="dashboard-card flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-muted-foreground" />
             </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                {atRiskTasks.length} task{atRiskTasks.length > 1 ? 's' : ''} at risk
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Tasks migrated 2+ times
+              </p>
+            </div>
+          </div>
+        )}
 
-            {focusTasks.length > 0 ? (
-              <div className="space-y-3">
-                {focusTasks.map(task => (
-                  <div key={task.id} className="relative">
-                    <TaskItem task={task} onClick={handleTaskClick} />
+        {/* Today's Focus - Main section like reference */}
+        <div className="dashboard-card">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-foreground">Today's Focus</h2>
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(), 'h:mm a')}
+              </p>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center">
+              <Target className="w-4 h-4 text-foreground/70" />
+            </div>
+          </div>
+
+          {focusTasks.length > 0 ? (
+            <div className="space-y-3">
+              {focusTasks.map((task, index) => (
+                <div key={task.id} className="relative">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {index + 1}
+                    </span>
                     {task.id.startsWith('skill-') && (
-                      <span className="absolute top-2 right-12 text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
                         Skill
                       </span>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No focus tasks for today</p>
-                <p className="text-sm mt-1">Add skill schedules or high priority tasks</p>
-              </div>
-            )}
+                  <TaskItem task={task} onClick={handleTaskClick} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No focus tasks for today</p>
+            </div>
+          )}
 
-            {todayTasks.length > focusTasks.length && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-sm text-muted-foreground">
-                  + {todayTasks.length - focusTasks.length} more tasks today
-                </p>
-              </div>
-            )}
+          {todayTasks.length > focusTasks.length && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                + {todayTasks.length - focusTasks.length} more tasks today
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Monthly Stats Card */}
+        <div className="dashboard-card cursor-pointer" onClick={() => setMonthDetailOpen(true)}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground">Monthly Stats</h3>
+            <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-foreground/70" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-foreground">{monthStats.completedDays}</p>
+              <p className="text-xs text-muted-foreground">Complete</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-foreground">{monthStats.partialDays}</p>
+              <p className="text-xs text-muted-foreground">Partial</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-foreground">{monthStats.missedDays}</p>
+              <p className="text-xs text-muted-foreground">Missed</p>
+            </div>
           </div>
         </div>
 
         {/* Sleep Tracking Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <SleepTracker />
           <SleepChart days={7} />
         </div>
 
-        {/* Capacity, Weekly & Fixed Tasks */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Capacity & Weekly */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <CapacitySelector />
           <WeeklySnapshot />
           <FixedDailyTasksCard />
@@ -256,36 +245,33 @@ const Home = () => {
         <WeeklySkillScheduleCard />
 
         {/* Goals Preview */}
-        <div className="dashboard-card">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-semibold text-foreground">Active Goals</h2>
-            <a href="/goals" className="text-sm text-primary hover:underline">View all →</a>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {goals.slice(0, 3).map(goal => (
-              <div key={goal.id} className="p-4 rounded-xl bg-secondary/50 border border-border">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {goal.type}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{goal.progress}%</span>
+        {goals.length > 0 && (
+          <div className="dashboard-card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-foreground">Active Goals</h2>
+              <a href="/goals" className="text-sm text-muted-foreground hover:text-foreground transition-colors">View all →</a>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {goals.slice(0, 3).map(goal => (
+                <div key={goal.id} className="p-4 rounded-xl bg-secondary/50 border border-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                      {goal.type}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{goal.progress}%</span>
+                  </div>
+                  <h3 className="font-medium text-foreground truncate">{goal.title}</h3>
+                  <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div 
+                      className="h-full rounded-full bg-foreground/50 transition-all"
+                      style={{ width: `${goal.progress}%` }}
+                    />
+                  </div>
                 </div>
-                <h3 className="font-medium text-foreground truncate">{goal.title}</h3>
-                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div 
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${goal.progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            {goals.length === 0 && (
-              <div className="col-span-3 text-center py-8 text-muted-foreground">
-                <p>No goals set yet. Add goals to track your progress.</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Month Detail Dialog */}

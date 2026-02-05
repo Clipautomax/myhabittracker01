@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Calendar, Target, BarChart3, Sun, Zap } from 'lucide-react';
+import { Home, Calendar, Target, BarChart3, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -14,12 +14,12 @@ export const Sidebar = () => {
   const location = useLocation();
 
   return (
-    <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
+    <aside className="w-64 min-h-screen bg-background border-r border-border flex flex-col">
       {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
+      <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Zap className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-2xl bg-secondary border border-border flex items-center justify-center">
+            <span className="text-lg font-bold text-foreground">F</span>
           </div>
           <div>
             <h1 className="font-semibold text-foreground">Focus OS</h1>
@@ -48,10 +48,10 @@ export const Sidebar = () => {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="dashboard-card p-4">
-          <p className="text-xs text-muted-foreground mb-2">Pro tip</p>
-          <p className="text-sm text-foreground">
+      <div className="p-4 border-t border-border">
+        <div className="p-4 rounded-2xl bg-secondary/50 border border-border">
+          <p className="text-xs text-muted-foreground mb-1">Pro tip</p>
+          <p className="text-sm text-foreground/80">
             Complete all daily tasks to achieve 100% execution score.
           </p>
         </div>

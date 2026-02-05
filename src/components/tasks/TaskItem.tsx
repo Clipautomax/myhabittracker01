@@ -19,7 +19,18 @@ interface TaskItemProps {
 }
 
 export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => {
-  const { completeTask, migrateTask, deleteTask } = usePlanner();
+  const { completeTask, completeSkillTask, migrateTask, deleteTask, tasks } = usePlanner();
+
+  const isSkillTask = task.id.startsWith('skill-');
+  
+  // For skill tasks, check if there's a matching completed regular task
+  const isSkillTaskCompleted = () => {
+    if (!isSkillTask) return task.status === 'Completed';
+    const matchingTask = tasks.find(
+      t => t.title === task.title && t.date === task.date && t.status === 'Completed'
+    );
+    return !!matchingTask;
+  };
 
   const priorityClass = {
     High: 'priority-high',
@@ -27,7 +38,16 @@ export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => 
     Low: 'priority-low',
   }[task.priority];
 
+  const handleComplete = () => {
+    if (isSkillTask) {
+      completeSkillTask(task.id, task.date);
+    } else {
+      completeTask(task.id);
+    }
+  };
+
   const handleMigrate = () => {
+    if (isSkillTask) return; // Can't migrate skill tasks
     const tomorrow = format(addDays(new Date(task.date), 1), 'yyyy-MM-dd');
     migrateTask(task.id, tomorrow);
   };
@@ -39,19 +59,21 @@ export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => 
     onClick?.(task);
   };
 
+  const isCompleted = isSkillTaskCompleted();
+
   return (
     <div
       className={cn(
-        'dashboard-card flex items-center gap-4 group cursor-pointer hover:border-primary/50 transition-colors',
+        'dashboard-card flex items-center gap-4 group cursor-pointer hover:border-muted-foreground/30 transition-colors',
         priorityClass,
-        task.status === 'Completed' && 'opacity-60'
+        isCompleted && 'opacity-50'
       )}
       onClick={handleClick}
     >
       <Checkbox
-        checked={task.status === 'Completed'}
-        onCheckedChange={() => completeTask(task.id)}
-        className="data-[state=checked]:bg-status-completed data-[state=checked]:border-status-completed"
+        checked={isCompleted}
+        onCheckedChange={handleComplete}
+        className="data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
       />
       
       <div className="flex-1 min-w-0">
@@ -59,19 +81,19 @@ export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => 
           <h4
             className={cn(
               'font-medium truncate',
-              task.status === 'Completed' && 'line-through text-muted-foreground'
+              isCompleted && 'line-through text-muted-foreground'
             )}
           >
             {task.title}
           </h4>
           {task.migratedCount >= 2 && (
-            <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--status-missed))]/20 text-[hsl(var(--status-missed))]">
+            <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
               <AlertTriangle className="w-3 h-3" />
               At Risk
             </span>
           )}
           {task.migratedCount > 0 && task.migratedCount < 2 && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--status-migrated))]/20 text-[hsl(var(--status-migrated))]">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
               ↻{task.migratedCount}
             </span>
           )}
@@ -80,7 +102,7 @@ export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => 
           {task.time && <span>{task.time}</span>}
           {showDate && <span>{format(new Date(task.date), 'MMM dd')}</span>}
           {task.lastMigratedDate && (
-            <span className="text-xs text-[hsl(var(--status-migrated))]">
+            <span className="text-xs text-muted-foreground">
               Moved {format(new Date(task.lastMigratedDate), 'MMM d')}
             </span>
           )}
@@ -88,27 +110,29 @@ export const TaskItem = ({ task, showDate = false, onClick }: TaskItemProps) => 
         </div>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleMigrate}>
-            <ArrowRight className="w-4 h-4 mr-2" />
-            Move to tomorrow
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => deleteTask(task.id)} className="text-destructive">
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {!isSkillTask && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleMigrate}>
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Move to tomorrow
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => deleteTask(task.id)} className="text-destructive">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 };

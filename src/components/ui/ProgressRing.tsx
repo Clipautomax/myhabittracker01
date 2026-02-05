@@ -34,7 +34,7 @@ export const ProgressRing = ({
         />
         {/* Progress circle */}
         <circle
-          className="text-primary transition-all duration-500 ease-out"
+          className="text-foreground/70 transition-all duration-500 ease-out"
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
