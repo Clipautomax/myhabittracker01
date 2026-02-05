@@ -2,84 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 95%;
+    /* Pure black AMOLED theme */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 24 95% 53%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 0%;
 
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 14%;
+    --muted: 0 0% 15%;
     --muted-foreground: 0 0% 55%;
 
-    --accent: 24 95% 53%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 24 95% 53%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 50%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    /* Status colors */
-    --status-completed: 142 71% 45%;
-    --status-partial: 45 93% 47%;
-    --status-missed: 0 72% 51%;
-    --status-migrated: 217 91% 60%;
-    --status-pending: 0 0% 45%;
+    /* Status colors - neutral monochrome */
+    --status-completed: 0 0% 75%;
+    --status-partial: 0 0% 55%;
+    --status-missed: 0 0% 35%;
+    --status-migrated: 0 0% 45%;
+    --status-pending: 0 0% 25%;
 
-    /* Chart colors */
-    --chart-1: 24 95% 53%;
-    --chart-2: 142 71% 45%;
-    --chart-3: 45 93% 47%;
-    --chart-4: 0 72% 51%;
-    --chart-5: 217 91% 60%;
+    /* Chart colors - subtle grays */
+    --chart-1: 0 0% 85%;
+    --chart-2: 0 0% 65%;
+    --chart-3: 0 0% 50%;
+    --chart-4: 0 0% 35%;
+    --chart-5: 0 0% 25%;
 
-    --sidebar-background: 0 0% 7%;
-    --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 24 95% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 18%;
-    --sidebar-ring: 24 95% 53%;
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 70%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 11%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 0 0% 50%;
   }
 
   .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 95%;
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 24 95% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 14%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
     --muted-foreground: 0 0% 55%;
-    --accent: 24 95% 53%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 24 95% 53%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 50%;
   }
 }
 
@@ -100,27 +101,27 @@
   }
 
   .dashboard-card-hover {
-    @apply dashboard-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
+    @apply dashboard-card hover:border-muted-foreground/30 hover:bg-card/80;
   }
 
   .status-completed {
-    @apply bg-[hsl(var(--status-completed))] text-white;
+    @apply bg-foreground/80 text-background;
   }
 
   .status-partial {
-    @apply bg-[hsl(var(--status-partial))] text-black;
+    @apply bg-foreground/50 text-background;
   }
 
   .status-missed {
-    @apply bg-[hsl(var(--status-missed))] text-white;
+    @apply bg-foreground/30 text-background;
   }
 
   .status-migrated {
-    @apply bg-[hsl(var(--status-migrated))] text-white;
+    @apply bg-foreground/40 text-background;
   }
 
   .status-pending {
-    @apply bg-[hsl(var(--status-pending))] text-white;
+    @apply bg-foreground/20 text-foreground;
   }
 
   .progress-ring {
@@ -132,7 +133,7 @@
   }
 
   .nav-item-active {
-    @apply nav-item bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground;
+    @apply nav-item bg-secondary text-foreground hover:bg-secondary hover:text-foreground;
   }
 
   .stat-value {
@@ -144,15 +145,28 @@
   }
 
   .priority-high {
-    @apply border-l-4 border-l-[hsl(var(--status-missed))];
+    @apply border-l-4 border-l-foreground/70;
   }
 
   .priority-medium {
-    @apply border-l-4 border-l-[hsl(var(--status-partial))];
+    @apply border-l-4 border-l-foreground/40;
   }
 
   .priority-low {
-    @apply border-l-4 border-l-[hsl(var(--status-migrated))];
+    @apply border-l-4 border-l-foreground/20;
+  }
+
+  /* Mobile bottom nav */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-3 flex justify-around items-center z-50 md:hidden;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-1 text-muted-foreground transition-colors p-2 rounded-xl;
+  }
+
+  .bottom-nav-item-active {
+    @apply bottom-nav-item text-foreground bg-secondary;
   }
 }
 
@@ -173,5 +187,10 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border));
     border-radius: 3px;
+  }
+
+  /* Safe area for mobile bottom nav */
+  .pb-safe {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   }
 }

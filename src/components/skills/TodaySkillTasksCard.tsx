@@ -13,7 +13,7 @@ export const TodaySkillTasksCard = () => {
     skipSkillTask,
     unskipSkillTask,
     isSkillTaskSkipped,
-    completeTask,
+    completeSkillTask,
     tasks,
   } = usePlanner();
 
@@ -30,9 +30,8 @@ export const TodaySkillTasksCard = () => {
     s => s.isActive && s.dayOfWeek === getDayOfWeek()
   );
 
-  // Track completion state in regular tasks (skill tasks are virtual, need to track in real tasks)
+  // Track completion state in regular tasks
   const isSkillTaskCompleted = (skillTask: Task) => {
-    // Check if there's a matching completed task in the regular task list
     const matchingTask = tasks.find(
       t => t.title === skillTask.title && t.date === today && t.status === 'Completed'
     );
@@ -40,7 +39,7 @@ export const TodaySkillTasksCard = () => {
   };
 
   if (todaySchedules.length === 0) {
-    return null; // Don't show card if no skill tasks for today
+    return null;
   }
 
   return (
@@ -50,8 +49,8 @@ export const TodaySkillTasksCard = () => {
           <h3 className="font-semibold text-foreground">Today's Skill Focus</h3>
           <p className="text-sm text-muted-foreground">{getDayOfWeek()}</p>
         </div>
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Target className="w-4 h-4 text-primary" />
+        <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center">
+          <Target className="w-4 h-4 text-foreground/70" />
         </div>
       </div>
 
@@ -65,7 +64,7 @@ export const TodaySkillTasksCard = () => {
             <div
               key={schedule.id}
               className={cn(
-                'flex items-center gap-3 p-3 rounded-lg bg-secondary/50 border border-border',
+                'flex items-center gap-3 p-3 rounded-xl bg-secondary/50 border border-border',
                 isSkipped && 'opacity-50 line-through',
                 isCompleted && 'opacity-60'
               )}
@@ -74,10 +73,11 @@ export const TodaySkillTasksCard = () => {
                 checked={isCompleted}
                 disabled={isSkipped}
                 onCheckedChange={() => {
-                  // This would need to create a real task entry when checked
-                  // For now, skill tasks are display-only
+                  if (skillTask) {
+                    completeSkillTask(skillTask.id, today);
+                  }
                 }}
-                className="data-[state=checked]:bg-status-completed data-[state=checked]:border-status-completed"
+                className="data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export const TodaySkillTasksCard = () => {
                   )}>
                     {schedule.skillName}
                   </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
                     {schedule.focusArea}
                   </span>
                 </div>
@@ -100,7 +100,7 @@ export const TodaySkillTasksCard = () => {
                 variant="ghost"
                 onClick={() => isSkipped ? unskipSkillTask(schedule.id, today) : skipSkillTask(schedule.id, today)}
                 className={cn(
-                  'shrink-0',
+                  'shrink-0 rounded-xl',
                   isSkipped && 'text-muted-foreground'
                 )}
                 title={isSkipped ? 'Restore task' : 'Skip today'}
